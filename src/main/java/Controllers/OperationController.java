@@ -89,7 +89,7 @@ public class OperationController {
             }
             else if(Arrays.stream(request.getHeader("X-User-Permissions")
                     .split(",")).anyMatch(s -> s.equals("CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE"))){
-                return null;
+                return null; ///TODO: ДОДЕЛАТЬ СИТУАЦИЮ, ГДЕ ЧЕЛ МОЖЕТ АПРУВАТЬ ПРОЕКТЫ И УДАЛЯТЬ ИХ ПОСЛЕ АПРУВА
             }
             else return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights");
         } catch(Exception ex){
