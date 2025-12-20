@@ -1,12 +1,15 @@
 package Model.OperationModel;
 
+import Constants.OperationStatuses;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
-public class OperationModelDTO {
+public class OperationModelDeleteDTO {
+
+    @JsonProperty("Id")
+    public Long id;
 
     @JsonProperty("Description")
     public String description;
@@ -31,6 +34,9 @@ public class OperationModelDTO {
 
     @JsonProperty("ResponsibleEmail")
     public String responsibleEmail;
+
+    @JsonProperty("ApprovedStatus")
+    public OperationStatuses approvedStatus;
 
     @JsonIgnore
     public boolean isValid(){

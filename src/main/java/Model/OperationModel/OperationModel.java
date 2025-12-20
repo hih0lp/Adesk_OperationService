@@ -1,6 +1,7 @@
 package Model.OperationModel;
 
 
+import Constants.OperationStatuses;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.Getter;
@@ -42,4 +43,7 @@ public class OperationModel {
 
     @Column(name = "responsible_email")
     private String responsibleEmail;
+
+    @Column(name = "approvedStatus")
+    private OperationStatuses approvedStatus;
 }
