@@ -1,24 +1,22 @@
-package Model.OperationModel;
+package Adesk_OperationService.Model.OperationModel;
 
 
-import Constants.OperationStatuses;
+import Adesk_OperationService.Constants.OperationStatuses;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.ZonedDateTime;
+
 
 @Entity
 @Data
-@Table(name = "ADESK_OPERATIONS")
-@NoArgsConstructor
-@Getter
-@Setter
 public class OperationModel {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long Id;
+    private Long id;
 
     @Column(name = "description")
     private String description;
@@ -32,8 +30,15 @@ public class OperationModel {
     @Column(name = "name_of_counterparty")
     private String nameOfCounterparty;
 
-    @Column(name = "category_name")
-    private String categoryName;
+    @Column(name = "sum")
+    private Long sum;
+
+    /// TODO : СДЕЛАТЬ ОТВЕТСТВЕННОГО МЕНЕДЖЕРА - ЭТО ТОТ, КТО СОЗДАЛ КОНТРАГЕНТА (ПОИСК ПО ИМЕНИ)
+
+    @Column(name = "created_at")
+    private ZonedDateTime createdAt;
+//    @Column(name = "category_name")
+//    private String categoryName;
 
     @Column(name = "company_id")
     private Long companyId;
@@ -46,4 +51,6 @@ public class OperationModel {
 
     @Column(name = "approvedStatus")
     private OperationStatuses approvedStatus;
+
+    /// TODO : СДЕЛАТЬ ФАЙЛЫ
 }

@@ -1,4 +1,4 @@
-package Constants;
+package Adesk_OperationService.Constants;
 
 public enum OperationStatuses {
     APPROVED,

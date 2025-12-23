@@ -1,22 +1,27 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/Testus
-
     username: postgres
     password: aternosru123
-
     driver-class-name: org.postgresql.Driver
-
-    session:
-        store-type: none
-
-    jpa:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
       hibernate:
-        ddl-auto: update
-      show-sql: true
+        format_sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  session:
+    store-type: none
 
-      properties:
-        hibernate:
-          format_sql: true
-
-      database-platform: org.hibernate.dialect.PostgreSQLDialect
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: mappings, beans, env, health
+    endpoint:
+      mappings:
+        enabled: true
+server:
+  port: 8087

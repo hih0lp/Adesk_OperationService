@@ -1,13 +1,12 @@
-package com.example.demo;
+package Adesk_OperationService;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class OperationServiceMain {
+public class Application {
 
 	public static void main(String[] args) {
-		SpringApplication.run(OperationServiceMain.class, args);
+		SpringApplication.run(Adesk_OperationService.Application.class, args);
 	}
-
 }

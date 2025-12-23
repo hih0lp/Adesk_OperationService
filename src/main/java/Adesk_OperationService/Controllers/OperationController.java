@@ -1,12 +1,11 @@
-package Controllers;
+package Adesk_OperationService.Controllers;
 
-import Constants.OperationStatuses;
-import Interfaces.OperationRepository;
-import Model.OperationModel.OperationModel;
-import Model.OperationModel.OperationModelDTO;
-import Model.OperationModel.OperationModelDeleteDTO;
+import Adesk_OperationService.Constants.OperationStatuses;
+import Adesk_OperationService.Repository.OperationRepository;
+import Adesk_OperationService.Model.OperationModel.OperationModel;
+import Adesk_OperationService.Model.OperationModel.OperationModelDTO;
+import Adesk_OperationService.Model.OperationModel.OperationModelDeleteDTO;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -15,14 +14,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.sql.Array;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/operation")
+@RequestMapping("/operations")
 @RequiredArgsConstructor
 public class OperationController {
     private final Logger log = LoggerFactory.getLogger(OperationController.class);
@@ -42,12 +40,14 @@ public class OperationController {
             var newOperation = new OperationModel();
             newOperation.setTypeOfOperation(dto.getTypeOfOperation());
             newOperation.setDescription(dto.getDescription());
-            newOperation.setCategoryName(dto.getCategoryName());
+//            newOperation.setCategoryName(dto.getCategoryName());
             newOperation.setProjectName(dto.getProjectName());
             newOperation.setCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             newOperation.setNameOfCounterparty(dto.getNameOfCounterparty());
             newOperation.setResponsibleEmail(request.getHeader("X-User-Email"));
             newOperation.setResponsibleLogin(dto.getResponsibleLogin());
+            newOperation.setCreatedAt(ZonedDateTime.now());
+            newOperation.setSum(dto.getSum());
             newOperation.setApprovedStatus(OperationStatuses.APPROVING);
 
             _operationRepository.save(newOperation);
@@ -88,8 +88,20 @@ public class OperationController {
                 return ResponseEntity.ok().body("deleting successfully");
             }
             else if(Arrays.stream(request.getHeader("X-User-Permissions")
-                    .split(",")).anyMatch(s -> s.equals("CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE"))){
-                return null; ///TODO: ДОДЕЛАТЬ СИТУАЦИЮ, ГДЕ ЧЕЛ МОЖЕТ АПРУВАТЬ ПРОЕКТЫ И УДАЛЯТЬ ИХ ПОСЛЕ АПРУВА
+                    .split(",")).anyMatch(s -> s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE"))){
+
+                if (dtos.stream().anyMatch(s -> s.approvedStatus == OperationStatuses.APPROVED || s.approvedStatus == OperationStatuses.DISAPPROVED))
+                    return ResponseEntity.badRequest().body("you can only delete projects which is not approved");
+
+                if(!Arrays.stream(request.getHeader("X-User-Permissions").split(",")).anyMatch(s -> s.equals("REQUEST_WORK")))
+                    if(dtos.stream().anyMatch(s -> s.responsibleEmail != request.getHeader("X-User-Email")))
+                        return ResponseEntity.badRequest().body("you can only delete your projects");
+
+                List<Long> ids = dtos.stream().map(dto -> dto.getId()).collect(Collectors.toList());
+
+                _operationRepository.deleteAllById(ids);
+
+                return ResponseEntity.ok().body("deleting successfully");
             }
             else return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights");
         } catch(Exception ex){
@@ -98,3 +110,6 @@ public class OperationController {
         }
     }
 }
+
+
+///TODO : ПОИСК НУЖНО СДЕЛАТЬ ПО ТРИГРАММАМ
