@@ -1,15 +1,11 @@
 package Adesk_OperationService.Model.OperationModel;
 
-import Adesk_OperationService.Constants.OperationStatuses;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
-public class OperationModelDeleteDTO {
-
-    @JsonProperty("Id")
-    public Long id;
+public class RequestModelDTO {
 
     @JsonProperty("Description")
     public String description;
@@ -23,8 +19,13 @@ public class OperationModelDeleteDTO {
     @JsonProperty("NameOfCounterparty")
     public String nameOfCounterparty;
 
-    @JsonProperty("CategoryName")
-    public String categoryName;
+    @JsonProperty("Sum")
+    public Long sum;
+
+    @JsonProperty("Name")
+    public String name;
+//    @JsonProperty("CategoryName")
+//    public String categoryName;
 
 //    @JsonProperty("CompanyName")
 //    public String companyName;
@@ -35,9 +36,6 @@ public class OperationModelDeleteDTO {
     @JsonProperty("ResponsibleEmail")
     public String responsibleEmail;
 
-    @JsonProperty("ApprovedStatus")
-    public OperationStatuses approvedStatus;
-
     @JsonIgnore
     public boolean isValid(){
         return description != null && !description.trim().isEmpty() &&
@@ -45,8 +43,9 @@ public class OperationModelDeleteDTO {
                 projectName != null && !projectName.trim().isEmpty() &&
                 nameOfCounterparty != null && !nameOfCounterparty.trim().isEmpty() &&
 //                companyName != null && !companyName.trim().isEmpty() &&
-                responsibleLogin != null && responsibleLogin.trim().isEmpty() &&
-                responsibleEmail != null && responsibleEmail.trim().isEmpty() &&
-                categoryName != null && categoryName.trim().isEmpty();
+                responsibleLogin != null && !responsibleLogin.trim().isEmpty() &&
+                responsibleEmail != null && !responsibleEmail.trim().isEmpty() &&
+                sum != 0;
+//                categoryName != null && categoryName.trim().isEmpty();
     }
 }

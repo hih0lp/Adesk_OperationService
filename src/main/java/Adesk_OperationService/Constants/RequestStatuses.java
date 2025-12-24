@@ -1,6 +1,6 @@
 package Adesk_OperationService.Constants;
 
-public enum OperationStatuses {
+public enum RequestStatuses {
     APPROVED,
     APPROVING,
     DISAPPROVED

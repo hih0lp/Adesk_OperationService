@@ -1,19 +1,16 @@
 package Adesk_OperationService.Model.OperationModel;
 
 
-import Adesk_OperationService.Constants.OperationStatuses;
+import Adesk_OperationService.Constants.RequestStatuses;
 import jakarta.persistence.*;
 import lombok.Data;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.ZonedDateTime;
 
 
 @Entity
 @Data
-public class OperationModel {
+public class RequestModel {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -33,7 +30,8 @@ public class OperationModel {
     @Column(name = "sum")
     private Long sum;
 
-    /// TODO : СДЕЛАТЬ ОТВЕТСТВЕННОГО МЕНЕДЖЕРА - ЭТО ТОТ, КТО СОЗДАЛ КОНТРАГЕНТА (ПОИСК ПО ИМЕНИ)
+    @Column(name = "name")
+    private String name;
 
     @Column(name = "created_at")
     private ZonedDateTime createdAt;
@@ -43,14 +41,17 @@ public class OperationModel {
     @Column(name = "company_id")
     private Long companyId;
 
-    @Column(name = "responsible_login")
-    private String responsibleLogin;
+    @Column(name = "creator_login")
+    private String creatorLogin; //тот, кто создал заявки
 
-    @Column(name = "responsible_email")
-    private String responsibleEmail;
+    @Column(name = "creator_email")
+    private String creatorEmail;
+
+    @Column(name = "responsible_manager")
+    private String responsibleManager; // ответственный менеджер (тот, кто сделал контрагента)
 
     @Column(name = "approvedStatus")
-    private OperationStatuses approvedStatus;
+    private RequestStatuses approvedStatus;
 
     /// TODO : СДЕЛАТЬ ФАЙЛЫ
 }
