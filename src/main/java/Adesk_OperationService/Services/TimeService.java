@@ -6,9 +6,8 @@ import Adesk_OperationService.Repository.RequestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.time.*;
+import java.time.temporal.TemporalAdjusters;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -17,6 +16,34 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TimeService {
     private final RequestRepository _requestRepository;
+
+        // Метод фильтрует и сортирует переданные запросы за текущую неделю в UTC
+        public List<RequestModel> filterAndSortThisWeekInUTC(List<RequestModel> requests) {
+            ZoneId utcZone = ZoneOffset.UTC;
+            ZonedDateTime now = ZonedDateTime.now(utcZone);
+
+            // Начало недели (понедельник) в UTC
+            ZonedDateTime startOfWeek = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                    .toLocalDate()
+                    .atStartOfDay(utcZone);
+
+            // Конец недели (воскресенье) в UTC
+            ZonedDateTime endOfWeek = now.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY))
+                    .toLocalDate()
+                    .atTime(LocalTime.MAX)
+                    .atZone(utcZone);
+
+            return requests.stream()
+                    .filter(request -> {
+                        ZonedDateTime createdAt = request.getCreatedAt().withZoneSameInstant(utcZone);
+                        return !createdAt.isBefore(startOfWeek) && !createdAt.isAfter(endOfWeek);
+                    })
+                    .sorted(Comparator.comparing(
+                            request -> request.getCreatedAt().withZoneSameInstant(utcZone),
+                            Comparator.reverseOrder()
+                    ))
+                    .collect(Collectors.toList());
+        }
 
     public List<RequestModel> sortByLocalDateSystemZone(List<RequestModel> requests) {
 //        List<RequestModel> requests = _requestRepository.findAll();

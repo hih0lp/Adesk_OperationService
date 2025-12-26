@@ -1,6 +1,7 @@
 package Adesk_OperationService.Repository;
 
 import Adesk_OperationService.Model.OperationModel.RequestModel;
+import org.apache.coyote.Request;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -11,4 +12,5 @@ public interface RequestRepository extends JpaRepository<RequestModel, Long> {
     Optional<RequestModel> findByNameAndProjectNameAndCompanyId(String name, String projectName, Long companyName);
 //    List<RequestModel> findByProjectName(String projectName);
     List<RequestModel> findByProjectNameAndCompanyId(String projectName, Long companyId);
+    List<RequestModel> findByCompanyId(Long companyId);
 }

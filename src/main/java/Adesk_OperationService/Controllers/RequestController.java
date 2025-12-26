@@ -119,15 +119,13 @@ public class RequestController {
         }
     }
 
-    @GetMapping("/get-requests-by-project-name/{projectName}/{requestName}")
-    public ResponseEntity<?> getRequestsByProjectName(@PathVariable String projectName, @PathVariable String requestName, HttpServletRequest request){
+    @GetMapping("/get-requests")
+    public ResponseEntity<?> getRequestsByProjectName(HttpServletRequest request){
         try{
-            if(projectName == null)
-                return ResponseEntity.badRequest().body("project name cannot be null");
             if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
                 return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
-            var requests = _requestRepository.findByNameAndProjectNameAndCompanyId(requestName, projectName, Long.parseLong(request.getHeader("X-Company-Id")));
+            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             if(requests.isEmpty())
                 return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
@@ -138,7 +136,7 @@ public class RequestController {
         }
     }
 
-    @PostMapping("/approve-request/{request-id}")
+    @PostMapping("/approve-request/{requestId}")
     public ResponseEntity<?> approveRequest(@PathVariable Long requestId, HttpServletRequest request){
         try{
             if(requestId == null)
@@ -195,8 +193,8 @@ public class RequestController {
         }
     }
 
-    @GetMapping("/get-requests-order-by-date/{projectName}")
-    public ResponseEntity<?> getRequestsOrderByDate(@PathVariable String projectName, HttpServletRequest request){
+    @GetMapping("/get-requests-order-by-date-today/{projectName}")
+    public ResponseEntity<?> getRequestsOrderByDateToday(@PathVariable String projectName, HttpServletRequest request){
         try {
             if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
                 return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
@@ -211,7 +209,46 @@ public class RequestController {
             return ResponseEntity.status(500).body("Logic error");
         }
     }
+
+    @GetMapping("/get-requests-order-by-date-week/{projectName}")
+    public ResponseEntity<?> getRequestsOrderByDateWeek(@PathVariable String projectName, HttpServletRequest request){
+        try{
+            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
+
+            var requests = _requestRepository.findByProjectNameAndCompanyId(projectName, Long.parseLong(request.getHeader("X-Company-Id")));
+            if(requests.isEmpty())
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+
+            return ResponseEntity.ok().body(_timeService.filterAndSortThisWeekInUTC(requests));
+        } catch(Exception ex) {
+            log.error(ex.getMessage());
+            return ResponseEntity.status(500).body("Logic error");
+        }
+    }
+
+    @GetMapping("/get-company-requests")
+    public ResponseEntity<?> getCompanyRequests(HttpServletRequest request){
+        try {
+            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
+
+            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+            if(requests.isEmpty())
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+
+            return ResponseEntity.ok().body(requests);
+        } catch (Exception ex){
+            log.error(ex.getMessage());
+            return ResponseEntity.status(500).body("Logic error");
+        }
+    }
+
 }
 
 
 ///TODO : ПОИСК НУЖНО СДЕЛАТЬ ПО ТРИГРАММАМ
+///TODO : ОПЕРАЦИИ ТОЛЬКО АПРУВНУТЫЕ МОГУТ БЫТЬ
+///TODO : ЗАЯВКИ ВСЕ МОГУТ БЫТЬ (ЛЮБОЙ СТАТУС МОЖЕТ БЫТЬ)
+///TODO : ПОИСК ЗАЯВОК НЕ ДОЛЖЕН БЫ ПО ПРОЕКТУ (ДОЛЖЕН БЫТЬ ПРОСТО ЗАПРОС НА ВСЕ МАТЬ ТВОЮ ЗАПРОСЫ БЛЯ)
+/// TODO : СДЕЛАТЬ ВАЛИДАЦИЮ НА СТАТУС ЗАЯВКИ  (ЕСЛИ ПОПЫТАТЬСЯ ПОВТОРНО АПРУВНУТЬ АПРУВНУТУЮ ЗАЯВКУ)
