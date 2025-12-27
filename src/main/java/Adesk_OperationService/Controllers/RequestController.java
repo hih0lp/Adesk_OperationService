@@ -1,6 +1,7 @@
 package Adesk_OperationService.Controllers;
 
 import Adesk_OperationService.Constants.RequestStatuses;
+import Adesk_OperationService.Model.OperationModel.SortByDateDTO;
 import Adesk_OperationService.Repository.RequestRepository;
 import Adesk_OperationService.Model.OperationModel.RequestModel;
 import Adesk_OperationService.Model.OperationModel.RequestModelDTO;
@@ -17,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import javax.lang.model.element.VariableElement;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
@@ -203,7 +205,7 @@ public class RequestController {
             if(requests.isEmpty())
                 return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            return ResponseEntity.ok().body(_timeService.sortByLocalDateSystemZone(requests));
+            return ResponseEntity.ok().body(_timeService.filterByToday(requests));
         } catch (Exception ex){
             log.error(ex.getMessage());
             return ResponseEntity.status(500).body("Logic error");
@@ -220,14 +222,54 @@ public class RequestController {
             if(requests.isEmpty())
                 return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            return ResponseEntity.ok().body(_timeService.filterAndSortThisWeekInUTC(requests));
+            return ResponseEntity.ok().body(_timeService.filterByCurrentWeek(requests));
         } catch(Exception ex) {
             log.error(ex.getMessage());
             return ResponseEntity.status(500).body("Logic error");
         }
     }
 
-    @GetMapping("/get-company-requests")
+    @GetMapping("/get-requests-order-by-dates")
+    public ResponseEntity<?> getRequestsOrderByDates(@RequestBody SortByDateDTO dto, HttpServletRequest request){
+        try {
+            if(!dto.isValid())
+                return ResponseEntity.badRequest().body("dto is invalid");
+
+            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
+
+            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+            if(requests.isEmpty())
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+
+            return ResponseEntity.ok().body(_timeService.filterByDateTimeRange(requests, dto.date1, dto.date2));
+        } catch (Exception ex){
+            log.error(ex.getMessage());
+            return ResponseEntity.status(500).body("Logic error");
+        }
+    }
+
+
+    @GetMapping("/get-requests-order-by-date-quarter/{projectName}/{numberOfQuarter}")
+    public ResponseEntity<?> getRequestsOrderByDateQuarter(@PathVariable String projectName, @PathVariable int numberOfQuarter, HttpServletRequest request){
+        try{
+            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
+
+            var requests = _requestRepository.findByProjectNameAndCompanyId(projectName, Long.parseLong(request.getHeader("X-Company-Id")));
+            if(requests.isEmpty())
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+
+            return ResponseEntity.ok().body(_timeService.filterByQuarter(requests, numberOfQuarter));
+        } catch(Exception ex) {
+            log.error(ex.getMessage());
+            return ResponseEntity.status(500).body("Logic error");
+        }
+    }
+
+
+
+    @GetMapping("/get-company-requests") //получение всех запросов по компании
     public ResponseEntity<?> getCompanyRequests(HttpServletRequest request){
         try {
             if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
@@ -243,6 +285,25 @@ public class RequestController {
             return ResponseEntity.status(500).body("Logic error");
         }
     }
+
+    @GetMapping("/get-company-operations")
+    public ResponseEntity<?> getCompanyOperations(HttpServletRequest request){
+        try{
+            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
+
+            var operations = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+            if(operations.isEmpty())
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+
+            return ResponseEntity.ok().body(operations.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED));
+        } catch(Exception ex){
+            log.error(ex.getMessage());
+            return ResponseEntity.status(500).body("Logic error");
+        }
+    }
+
+
 
 }
 
