@@ -19,7 +19,7 @@ public class RequestModel {
     private String description;
 
     @Column(name = "type_of_operation")
-    private String typeOfOperation; //income - outcome - transfer
+    private String typeOfOperation; //income - outcome - transfer - ФРОНТ САМ ВЫСТАВИТ, ЧТО НАДО И ПУСТЬ САМ ФИЛЬТРУЕТ ПО ЗНАКУ
 
     @Column(name = "project_name")
     private String projectName;

@@ -2,6 +2,7 @@ package Adesk_OperationService.Controllers;
 
 import Adesk_OperationService.Constants.RequestStatuses;
 import Adesk_OperationService.Model.OperationModel.SortByDateDTO;
+import Adesk_OperationService.Model.StatDTO;
 import Adesk_OperationService.Repository.RequestRepository;
 import Adesk_OperationService.Model.OperationModel.RequestModel;
 import Adesk_OperationService.Model.OperationModel.RequestModelDTO;
@@ -315,6 +316,26 @@ public class RequestController {
 
             return ResponseEntity.ok().body(operations.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED));
         } catch(Exception ex){
+            log.error(ex.getMessage());
+            return ResponseEntity.status(500).body("Logic error");
+        }
+    }
+
+
+    @GetMapping("/get-project-statistic/{projectName}")
+    public ResponseEntity<?> getProjectStatistic(@PathVariable String projectName, HttpServletRequest request){
+        try {
+            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
+
+            var projectOperations = _requestRepository.findByProjectNameAndCompanyId(projectName, Long.parseLong(request.getHeader("X-Company-Id")));
+            StatDTO stat = new StatDTO();
+            stat.setRevenue(projectOperations.stream().filter(x -> x.getSum() > 0).mapToDouble(x -> x.getSum()).sum());
+            stat.setProfit(projectOperations.stream().mapToDouble(x -> x.getSum()).sum());
+            stat.setCountOfOperations(projectOperations.stream().count());
+
+            return ResponseEntity.ok().body(stat);
+        } catch (Exception ex){
             log.error(ex.getMessage());
             return ResponseEntity.status(500).body("Logic error");
         }
