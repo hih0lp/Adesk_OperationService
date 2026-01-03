@@ -33,8 +33,8 @@ public class RequestModelDTO {
     @JsonProperty("ResponsibleLogin")
     public String responsibleLogin;
 
-    @JsonProperty("ResponsibleEmail")
-    public String responsibleEmail;
+//    @JsonProperty("ResponsibleEmail")
+//    public String responsibleEmail;
 
     @JsonIgnore
     public boolean isValid(){
@@ -43,8 +43,8 @@ public class RequestModelDTO {
                 projectName != null && !projectName.trim().isEmpty() &&
                 nameOfCounterparty != null && !nameOfCounterparty.trim().isEmpty() &&
 //                companyName != null && !companyName.trim().isEmpty() &&
-                responsibleLogin != null && !responsibleLogin.trim().isEmpty() &&
-                responsibleEmail != null && !responsibleEmail.trim().isEmpty() &&
+//                responsibleLogin != null && !responsibleLogin.trim().isEmpty() &&
+//                responsibleEmail != null && !responsibleEmail.trim().isEmpty() &&
                 sum != 0;
 //                categoryName != null && categoryName.trim().isEmpty();
     }

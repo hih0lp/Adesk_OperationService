@@ -57,6 +57,7 @@ public class RequestController {
             newRequest.setCreatorEmail(request.getHeader("X-User-Email"));
             newRequest.setName(dto.getName());
             newRequest.setCreatorLogin(dto.getResponsibleLogin());
+//            newRequest
             newRequest.setCreatedAt(ZonedDateTime.now());
             newRequest.setSum(dto.getSum());
             newRequest.setApprovedStatus(RequestStatuses.APPROVING);
@@ -75,20 +76,19 @@ public class RequestController {
     @Transactional
     public ResponseEntity<?> deleteRequestsAsync(@RequestBody List<RequestModelDeleteDTO> dtos, HttpServletRequest request){
         try{
-            for (var dto : dtos)
-                if(!dto.isValid())
-                    return ResponseEntity.badRequest().body("dto is invalid");
-
             if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
                 return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
+            /// TODO : СДЕЛАТЬ ПОЛУЧЕНИЕ ПО АЙДИ БЛЯТЬ НАХУЙ
+            var requests = _requestRepository.findAllById(dtos.stream().map(x -> x.getId()).collect(Collectors.toList()));
+
 
             if(Arrays.stream(request.getHeader("X-User-Permissions") //если может удалять только проекты до аппрува
                     .split(",")).anyMatch(s -> s.equals("CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE") || s.equals("REQUEST_WORK"))){ //для работы с запросами
-                if(dtos.stream().anyMatch(x -> x.approvedStatus != RequestStatuses.APPROVING))
-                    return ResponseEntity.badRequest().body("you can delete only project with approving status");
+                if(requests.stream().anyMatch(x -> x.getApprovedStatus() != RequestStatuses.APPROVING))
+                    return ResponseEntity.badRequest().body("you can delete only request with approving status");
                 if(!Arrays.stream(request.getHeader("X-User-Permissions").split(",")).anyMatch(s -> s.equals("REQUEST_WORK")))
-                    if (dtos.stream().anyMatch(s -> s.responsibleEmail != request.getHeader("X-User-Email")))
-                        return ResponseEntity.badRequest().body("you can delete only yours project");
+                    if (requests.stream().anyMatch(s -> !s.getCreatorEmail().equals(request.getHeader("X-User-Email"))))
+                        return ResponseEntity.badRequest().body("you can delete only yours request");
 
                 List<Long> ids = dtos.stream()
                                 .map(dto -> dto.getId())
@@ -101,11 +101,11 @@ public class RequestController {
             else if(Arrays.stream(request.getHeader("X-User-Permissions")
                     .split(",")).anyMatch(s -> s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE"))){
 
-                if (dtos.stream().anyMatch(s -> s.approvedStatus == RequestStatuses.APPROVED || s.approvedStatus == RequestStatuses.DISAPPROVED))
+                if (requests.stream().anyMatch(s -> s.getApprovedStatus() == RequestStatuses.APPROVED || s.getApprovedStatus() == RequestStatuses.DISAPPROVED))
                     return ResponseEntity.badRequest().body("you can only delete projects which is not approved");
 
                 if(!Arrays.stream(request.getHeader("X-User-Permissions").split(",")).anyMatch(s -> s.equals("REQUEST_WORK")))
-                    if(dtos.stream().anyMatch(s -> s.responsibleEmail != request.getHeader("X-User-Email")))
+                    if(requests.stream().anyMatch(s -> s.getResponsibleManager() != request.getHeader("X-User-Email")))
                         return ResponseEntity.badRequest().body("you can only delete your projects");
 
                 List<Long> ids = dtos.stream().map(dto -> dto.getId()).collect(Collectors.toList());
@@ -195,13 +195,13 @@ public class RequestController {
         }
     }
 
-    @GetMapping("/get-requests-order-by-date-today/{projectName}")
-    public ResponseEntity<?> getRequestsOrderByDateToday(@PathVariable String projectName, HttpServletRequest request){
+    @GetMapping("/get-requests-order-by-date-today")
+    public ResponseEntity<?> getRequestsOrderByDateToday(HttpServletRequest request){
         try {
             if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
                 return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
-            var requests = _requestRepository.findByProjectNameAndCompanyId(projectName, Long.parseLong(request.getHeader("X-Company-Id")));
+            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             if(requests.isEmpty())
                 return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
@@ -212,13 +212,13 @@ public class RequestController {
         }
     }
 
-    @GetMapping("/get-requests-order-by-date-week/{projectName}")
-    public ResponseEntity<?> getRequestsOrderByDateWeek(@PathVariable String projectName, HttpServletRequest request){
+    @GetMapping("/get-requests-order-by-date-week")
+    public ResponseEntity<?> getRequestsOrderByDateWeek(HttpServletRequest request){
         try{
             if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
                 return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
-            var requests = _requestRepository.findByProjectNameAndCompanyId(projectName, Long.parseLong(request.getHeader("X-Company-Id")));
+            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             if(requests.isEmpty())
                 return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
@@ -229,7 +229,7 @@ public class RequestController {
         }
     }
 
-    @GetMapping("/get-requests-order-by-dates")
+    @PostMapping("/get-requests-order-by-dates")
     public ResponseEntity<?> getRequestsOrderByDates(@RequestBody SortByDateDTO dto, HttpServletRequest request){
         try {
             if(!dto.isValid())
@@ -250,17 +250,34 @@ public class RequestController {
     }
 
 
-    @GetMapping("/get-requests-order-by-date-quarter/{projectName}/{numberOfQuarter}")
-    public ResponseEntity<?> getRequestsOrderByDateQuarter(@PathVariable String projectName, @PathVariable int numberOfQuarter, HttpServletRequest request){
+    @GetMapping("/get-requests-order-by-date-quarter/{numberOfQuarter}")
+    public ResponseEntity<?> getRequestsOrderByDateQuarter(@PathVariable int numberOfQuarter, HttpServletRequest request){
         try{
             if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
                 return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
-            var requests = _requestRepository.findByProjectNameAndCompanyId(projectName, Long.parseLong(request.getHeader("X-Company-Id")));
+            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             if(requests.isEmpty())
                 return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
             return ResponseEntity.ok().body(_timeService.filterByQuarter(requests, numberOfQuarter));
+        } catch(Exception ex) {
+            log.error(ex.getMessage());
+            return ResponseEntity.status(500).body("Logic error");
+        }
+    }
+
+    @GetMapping("/get-requests-order-by-date-year")
+    public ResponseEntity<?> getRequestsOrderByYear(HttpServletRequest request){
+        try{
+            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
+
+            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+            if(requests.isEmpty())
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+
+            return ResponseEntity.ok().body(_timeService.filterByCurrentYear(requests));
         } catch(Exception ex) {
             log.error(ex.getMessage());
             return ResponseEntity.status(500).body("Logic error");
@@ -302,14 +319,11 @@ public class RequestController {
             return ResponseEntity.status(500).body("Logic error");
         }
     }
-
-
-
 }
 
 
 ///TODO : ПОИСК НУЖНО СДЕЛАТЬ ПО ТРИГРАММАМ
-///TODO : ОПЕРАЦИИ ТОЛЬКО АПРУВНУТЫЕ МОГУТ БЫТЬ
-///TODO : ЗАЯВКИ ВСЕ МОГУТ БЫТЬ (ЛЮБОЙ СТАТУС МОЖЕТ БЫТЬ)
-///TODO : ПОИСК ЗАЯВОК НЕ ДОЛЖЕН БЫ ПО ПРОЕКТУ (ДОЛЖЕН БЫТЬ ПРОСТО ЗАПРОС НА ВСЕ МАТЬ ТВОЮ ЗАПРОСЫ БЛЯ)
+///TODO : ОПЕРАЦИИ ТОЛЬКО АПРУВНУТЫЕ МОГУТ БЫТЬ //есть
+///TODO : ЗАЯВКИ ВСЕ МОГУТ БЫТЬ (ЛЮБОЙ СТАТУС МОЖЕТ БЫТЬ) //есть
+///TODO : ПОИСК ЗАЯВОК НЕ ДОЛЖЕН БЫ ПО ПРОЕКТУ (ДОЛЖЕН БЫТЬ ПРОСТО ЗАПРОС НА ВСЕ МАТЬ ТВОЮ ЗАПРОСЫ БЛЯ) //есть
 /// TODO : СДЕЛАТЬ ВАЛИДАЦИЮ НА СТАТУС ЗАЯВКИ  (ЕСЛИ ПОПЫТАТЬСЯ ПОВТОРНО АПРУВНУТЬ АПРУВНУТУЮ ЗАЯВКУ)
