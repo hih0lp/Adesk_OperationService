@@ -42,8 +42,6 @@ public class RequestController {
         try {
             if(!dto.isValid())
                 return ResponseEntity.badRequest().body("dto is invalid");
-            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
             if(!Arrays.stream(request.getHeader("X-User-Permissions").split(",")).anyMatch(s -> s.equals("CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE")))
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights");
@@ -77,9 +75,7 @@ public class RequestController {
     @Transactional
     public ResponseEntity<?> deleteRequestsAsync(@RequestBody List<RequestModelDeleteDTO> dtos, HttpServletRequest request){
         try{
-            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
-            /// TODO : СДЕЛАТЬ ПОЛУЧЕНИЕ ПО АЙДИ БЛЯТЬ НАХУЙ
+            /// TODO : СДЕЛАТЬ ПОЛУЧЕНИЕ ПО АЙДИ БЛЯТЬ НАХУЙ //есть
             var requests = _requestRepository.findAllById(dtos.stream().map(x -> x.getId()).collect(Collectors.toList()));
 
 
@@ -125,8 +121,6 @@ public class RequestController {
     @GetMapping("/get-requests")
     public ResponseEntity<?> getRequestsByProjectName(HttpServletRequest request){
         try{
-            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
             var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             if(requests.isEmpty())
@@ -144,9 +138,6 @@ public class RequestController {
         try{
             if(requestId == null)
                 return ResponseEntity.badRequest().body("id cannot be null");
-
-            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
             if(!Arrays.stream(request.getHeader("X-User-Permissions")
                     .split(",")).anyMatch(s -> s.equals("REQUEST_WORK") || s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE")))
@@ -173,9 +164,6 @@ public class RequestController {
             if(requestId == null)
                 return ResponseEntity.badRequest().body("id cannot be null");
 
-            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
-
             if(!Arrays.stream(request.getHeader("X-User-Permissions")
                     .split(",")).anyMatch(s -> s.equals("REQUEST_WORK") || s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE")))
                 return ResponseEntity.badRequest().body("no rights");
@@ -199,8 +187,6 @@ public class RequestController {
     @GetMapping("/get-requests-order-by-date-today")
     public ResponseEntity<?> getRequestsOrderByDateToday(HttpServletRequest request){
         try {
-            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
             var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             if(requests.isEmpty())
@@ -216,8 +202,6 @@ public class RequestController {
     @GetMapping("/get-requests-order-by-date-week")
     public ResponseEntity<?> getRequestsOrderByDateWeek(HttpServletRequest request){
         try{
-            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
             var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             if(requests.isEmpty())
@@ -236,9 +220,6 @@ public class RequestController {
             if(!dto.isValid())
                 return ResponseEntity.badRequest().body("dto is invalid");
 
-            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
-
             var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             if(requests.isEmpty())
                 return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
@@ -254,8 +235,6 @@ public class RequestController {
     @GetMapping("/get-requests-order-by-date-quarter/{numberOfQuarter}")
     public ResponseEntity<?> getRequestsOrderByDateQuarter(@PathVariable int numberOfQuarter, HttpServletRequest request){
         try{
-            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
             var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             if(requests.isEmpty())
@@ -268,11 +247,27 @@ public class RequestController {
         }
     }
 
+    @GetMapping("/get-operations-by-project/{projectName}") //получение операций по проекту
+    public ResponseEntity<?> getProjectOperations(@PathVariable String projectName, HttpServletRequest request){
+        try {
+            var requests = _requestRepository.findByProjectNameAndCompanyId(projectName, Long.parseLong(request.getHeader("X-Company-Id")));
+            if(requests.isEmpty())
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+
+            var operations = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED).toList();
+            if(operations.isEmpty())
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+
+            return ResponseEntity.ok().body(operations);
+        } catch (Exception ex){
+            log.error(ex.getMessage());
+            return ResponseEntity.status(500).body("Logic error");
+        }
+    }
+
     @GetMapping("/get-requests-order-by-date-year")
     public ResponseEntity<?> getRequestsOrderByYear(HttpServletRequest request){
         try{
-            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
             var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             if(requests.isEmpty())
@@ -290,8 +285,6 @@ public class RequestController {
     @GetMapping("/get-company-requests") //получение всех запросов по компании
     public ResponseEntity<?> getCompanyRequests(HttpServletRequest request){
         try {
-            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
             var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             if(requests.isEmpty())
@@ -307,8 +300,6 @@ public class RequestController {
     @GetMapping("/get-company-operations")
     public ResponseEntity<?> getCompanyOperations(HttpServletRequest request){
         try{
-            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
             var operations = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             if(operations.isEmpty())
@@ -325,8 +316,6 @@ public class RequestController {
     @GetMapping("/get-project-statistic/{projectName}")
     public ResponseEntity<?> getProjectStatistic(@PathVariable String projectName, HttpServletRequest request){
         try {
-            if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty())
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("request has been came not from gateway");
 
             var projectOperations = _requestRepository.findByProjectNameAndCompanyId(projectName, Long.parseLong(request.getHeader("X-Company-Id")));
             StatDTO stat = new StatDTO();
