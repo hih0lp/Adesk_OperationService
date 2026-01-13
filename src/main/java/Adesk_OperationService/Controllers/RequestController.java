@@ -1,6 +1,7 @@
 package Adesk_OperationService.Controllers;
 
 import Adesk_OperationService.Constants.RequestStatuses;
+import Adesk_OperationService.Model.FileModel;
 import Adesk_OperationService.Model.OperationModel.SortByDateDTO;
 import Adesk_OperationService.Model.StatDTO;
 import Adesk_OperationService.Repository.RequestRepository;
@@ -17,11 +18,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.lang.model.element.VariableElement;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -46,6 +50,8 @@ public class RequestController {
             if(!Arrays.stream(request.getHeader("X-User-Permissions").split(",")).anyMatch(s -> s.equals("CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE")))
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights");
 
+
+
             var newRequest = new RequestModel();
             newRequest.setTypeOfOperation(dto.getTypeOfOperation());
             newRequest.setDescription(dto.getDescription());
@@ -61,6 +67,19 @@ public class RequestController {
             newRequest.setSum(dto.getSum());
             newRequest.setApprovedStatus(RequestStatuses.APPROVING);
 
+            if (dto.getFiles() != null && !dto.getFiles().isEmpty()) {
+                List<FileModel> fileModels = new ArrayList<>();
+
+                for (MultipartFile multipartFile : dto.getFiles()) {
+                    if (!multipartFile.isEmpty()) {
+                        FileModel fileModel = createFileModel(multipartFile, newRequest,
+                                request.getHeader("X-User-Email"));
+                        fileModels.add(fileModel);
+                    }
+                }
+                newRequest.setFiles(fileModels);
+            }
+
             _requestRepository.save(newRequest);
 
             return ResponseEntity.ok().body("successfully creating");
@@ -69,6 +88,21 @@ public class RequestController {
             log.error(ex.getMessage());
             return ResponseEntity.status(500).body("Logic error");
         }
+    }
+
+    private FileModel createFileModel(MultipartFile multipartFile,
+                                      RequestModel request,
+                                      String userEmail) throws IOException {
+
+        return FileModel.builder()
+                .originalFilename(multipartFile.getOriginalFilename())
+                .fileSize(multipartFile.getSize())
+                .content(multipartFile.getBytes())
+                .userEmail(userEmail)
+                .companyId(request.getCompanyId())
+                .request(request) // Устанавливаем связь с Request
+                .isCompressed(false)
+                .build();
     }
 
     @DeleteMapping("/delete-requests")
@@ -147,7 +181,10 @@ public class RequestController {
             if(requestOpt.isEmpty())
                 return ResponseEntity.badRequest().body("request doesn't exist");
 
+
             var req = requestOpt.get();
+            if(req.getApprovedStatus() == RequestStatuses.APPROVING)
+                return ResponseEntity.badRequest().body("request has been already approved");
             req.setApprovedStatus(RequestStatuses.APPROVED);
             _requestRepository.save(req);
 
@@ -207,7 +244,7 @@ public class RequestController {
             if(requests.isEmpty())
                 return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            return ResponseEntity.ok().body(_timeService.filterByCurrentWeek(requests));
+            return ResponseEntity.ok().body(_timeService.filterByCurrentWeek(requests)); //фильтрация по текущей неделе
         } catch(Exception ex) {
             log.error(ex.getMessage());
             return ResponseEntity.status(500).body("Logic error");
@@ -337,3 +374,4 @@ public class RequestController {
 ///TODO : ЗАЯВКИ ВСЕ МОГУТ БЫТЬ (ЛЮБОЙ СТАТУС МОЖЕТ БЫТЬ) //есть
 ///TODO : ПОИСК ЗАЯВОК НЕ ДОЛЖЕН БЫ ПО ПРОЕКТУ (ДОЛЖЕН БЫТЬ ПРОСТО ЗАПРОС НА ВСЕ МАТЬ ТВОЮ ЗАПРОСЫ БЛЯ) //есть
 /// TODO : СДЕЛАТЬ ВАЛИДАЦИЮ НА СТАТУС ЗАЯВКИ  (ЕСЛИ ПОПЫТАТЬСЯ ПОВТОРНО АПРУВНУТЬ АПРУВНУТУЮ ЗАЯВКУ)
+/// TODO : СДЕЛАТЬ ФИЛЬТРАЦИЮ ПО МЕСЯЦУ //есть

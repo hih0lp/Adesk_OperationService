@@ -3,6 +3,9 @@ package Adesk_OperationService.Model.OperationModel;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @Data
 public class RequestModelDTO {
@@ -33,6 +36,8 @@ public class RequestModelDTO {
     @JsonProperty("ResponsibleLogin")
     public String responsibleLogin;
 
+    @JsonProperty("Files")
+    public List<MultipartFile> files;
 //    @JsonProperty("ResponsibleEmail")
 //    public String responsibleEmail;
 
