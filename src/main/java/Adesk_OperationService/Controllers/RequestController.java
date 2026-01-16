@@ -2,12 +2,9 @@ package Adesk_OperationService.Controllers;
 
 import Adesk_OperationService.Constants.RequestStatuses;
 import Adesk_OperationService.Model.FileModel;
-import Adesk_OperationService.Model.OperationModel.SortByDateDTO;
+import Adesk_OperationService.Model.OperationModel.*;
 import Adesk_OperationService.Model.StatDTO;
 import Adesk_OperationService.Repository.RequestRepository;
-import Adesk_OperationService.Model.OperationModel.RequestModel;
-import Adesk_OperationService.Model.OperationModel.RequestModelDTO;
-import Adesk_OperationService.Model.OperationModel.RequestModelDeleteDTO;
 import Adesk_OperationService.Services.TimeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -45,54 +42,40 @@ public class RequestController {
     private final RequestRepository _requestRepository;
     private final TimeService _timeService;
 
-    @PostMapping(value = "/create-request", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = "/create-request", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Transactional
     @Operation(
-            summary = "Создание нового запроса",
-            description = "Создает новый запрос на операцию. Требуется право CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE"
+            summary = "Создание нового запроса с файлами",
+            description = "Создает новый запрос на операцию с прикрепленными файлами. Требуется право CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE"
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Запрос успешно создан"),
-            @ApiResponse(responseCode = "400", description = "Невалидные данные запроса"),
-            @ApiResponse(responseCode = "401", description = "Недостаточно прав"),
-            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
-    })
     public ResponseEntity<?> createOperationAsync(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Данные для создания запроса",
-                    required = true,
-                    content = @Content(schema = @Schema(implementation = RequestModelDTO.class))
-            )
-            @RequestBody RequestModelDTO dto,
-            HttpServletRequest request){
-        try {
-            if(!dto.isValid())
-                return ResponseEntity.badRequest().body("dto is invalid");
+            @ModelAttribute RequestFormDTO form,
+            HttpServletRequest request) {
 
-            if(!Arrays.stream(request.getHeader("X-User-Permissions").split(",")).anyMatch(s -> s.equals("CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE")))
+        try {
+            if(!form.isValid())
+                return ResponseEntity.badRequest().body("form data is invalid");
+
+            if(!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
+                    .anyMatch(s -> s.equals("CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE")))
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights");
 
-
-
             var newRequest = new RequestModel();
-            newRequest.setTypeOfOperation(dto.getTypeOfOperation());
-            newRequest.setDescription(dto.getDescription());
-//            newOperation.setCategoryName(dto.getCategoryName());
-            newRequest.setProjectName(dto.getProjectName());
+            newRequest.setTypeOfOperation(form.getTypeOfOperation());
+            newRequest.setDescription(form.getDescription());
+            newRequest.setProjectName(form.getProjectName());
             newRequest.setCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-            newRequest.setNameOfCounterparty(dto.getNameOfCounterparty());
+            newRequest.setNameOfCounterparty(form.getNameOfCounterparty());
             newRequest.setCreatorEmail(request.getHeader("X-User-Email"));
-            newRequest.setName(dto.getName());
-            newRequest.setCreatorLogin(dto.getResponsibleLogin());
-//            newRequest
+            newRequest.setName(form.getName());
+            newRequest.setCreatorLogin(form.getResponsibleLogin());
             newRequest.setCreatedAt(ZonedDateTime.now());
-            newRequest.setSum(dto.getSum()); //скорее всего, нужно обговорить с фронтом, как делать - либо фронт сам решает как выглядит инкам и тп, либо константы
-            newRequest.setApprovedStatus(RequestStatuses.APPROVING);
-
-            if (dto.getFiles() != null && !dto.getFiles().isEmpty()) {
+            newRequest.setSum(form.getSum());
+            newRequest.setApprovedStatus(RequestStatuses.APPROVING);    //В СЛУЧАЕ ЧЕГО МОЖНО УБРАТЬ КАКИЕ-ТО ПОЛЯ ИЗ ФОРМЫ И НЕ ДАВАТЬ ЕЮ ВСЮ ЗАПОЛНЯТЬ
+            if (form.getFiles() != null && !form.getFiles().isEmpty()) {
                 List<FileModel> fileModels = new ArrayList<>();
 
-                for (MultipartFile multipartFile : dto.getFiles()) {
+                for (MultipartFile multipartFile : form.getFiles()) {
                     if (!multipartFile.isEmpty()) {
                         FileModel fileModel = createFileModel(multipartFile, newRequest,
                                 request.getHeader("X-User-Email"));
@@ -103,12 +86,11 @@ public class RequestController {
             }
 
             _requestRepository.save(newRequest);
-
             return ResponseEntity.ok().body("successfully creating");
-        }
-        catch (Exception ex){
+
+        } catch (Exception ex) {
             log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Logic error");
         }
     }
 

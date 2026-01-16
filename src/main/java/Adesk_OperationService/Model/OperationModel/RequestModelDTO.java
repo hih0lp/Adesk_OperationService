@@ -36,7 +36,7 @@ public class RequestModelDTO {
     @JsonProperty("ResponsibleLogin")
     public String responsibleLogin;
 
-    @JsonProperty("Files")
+    @JsonIgnore
     public List<MultipartFile> files;
 //    @JsonProperty("ResponsibleEmail")
 //    public String responsibleEmail;
