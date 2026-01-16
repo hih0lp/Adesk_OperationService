@@ -2,24 +2,30 @@ package Adesk_OperationService.Filters;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.logging.Filter;
 
 @Component
 public class AuthMiddleware extends OncePerRequestFilter {
 
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
+        // Игнорируем эндпоинты Swagger
+        return path.startsWith("/swagger-ui") ||
+                path.startsWith("/v3/api-docs") ||
+                path.startsWith("/swagger-resources") ||
+                path.equals("/swagger-ui.html") ||
+                path.equals("/v3/api-docs/swagger-config") ||
+                path.equals("/favicon.ico");
+    }
 
     @Override
-    public void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws IOException, ServletException {
 
         if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty()){

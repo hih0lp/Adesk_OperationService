@@ -9,40 +9,62 @@ import Adesk_OperationService.Model.OperationModel.RequestModel;
 import Adesk_OperationService.Model.OperationModel.RequestModelDTO;
 import Adesk_OperationService.Model.OperationModel.RequestModelDeleteDTO;
 import Adesk_OperationService.Services.TimeService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.apache.coyote.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
-import javax.lang.model.element.VariableElement;
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/requests")
 @RequiredArgsConstructor
+@Tag(name = "Управление запросами", description = "API для работы с запросами на операции")
+@SecurityRequirement(name = "bearerAuth")
 public class RequestController {
     private final Logger log = LoggerFactory.getLogger(RequestController.class);
     private final RequestRepository _requestRepository;
     private final TimeService _timeService;
 
-
-
-    @PostMapping("/create-request")
-    public ResponseEntity<?> createOperationAsync(@RequestBody RequestModelDTO dto, HttpServletRequest request){
+    @PostMapping(value = "/create-request", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Transactional
+    @Operation(
+            summary = "Создание нового запроса",
+            description = "Создает новый запрос на операцию. Требуется право CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Запрос успешно создан"),
+            @ApiResponse(responseCode = "400", description = "Невалидные данные запроса"),
+            @ApiResponse(responseCode = "401", description = "Недостаточно прав"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    public ResponseEntity<?> createOperationAsync(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Данные для создания запроса",
+                    required = true,
+                    content = @Content(schema = @Schema(implementation = RequestModelDTO.class))
+            )
+            @RequestBody RequestModelDTO dto,
+            HttpServletRequest request){
         try {
             if(!dto.isValid())
                 return ResponseEntity.badRequest().body("dto is invalid");
@@ -64,7 +86,7 @@ public class RequestController {
             newRequest.setCreatorLogin(dto.getResponsibleLogin());
 //            newRequest
             newRequest.setCreatedAt(ZonedDateTime.now());
-            newRequest.setSum(dto.getSum());
+            newRequest.setSum(dto.getSum()); //скорее всего, нужно обговорить с фронтом, как делать - либо фронт сам решает как выглядит инкам и тп, либо константы
             newRequest.setApprovedStatus(RequestStatuses.APPROVING);
 
             if (dto.getFiles() != null && !dto.getFiles().isEmpty()) {
@@ -107,9 +129,25 @@ public class RequestController {
 
     @DeleteMapping("/delete-requests")
     @Transactional
-    public ResponseEntity<?> deleteRequestsAsync(@RequestBody List<RequestModelDeleteDTO> dtos, HttpServletRequest request){
+    @Operation(
+            summary = "Удаление запросов",
+            description = "Удаляет несколько запросов по ID. Доступ зависит от прав пользователя"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Запросы успешно удалены"),
+            @ApiResponse(responseCode = "400", description = "Невалидные данные или некорректный статус запросов"),
+            @ApiResponse(responseCode = "401", description = "Недостаточно прав"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    public ResponseEntity<?> deleteRequestsAsync(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Список ID запросов для удаления",
+                    required = true,
+                    content = @Content(schema = @Schema(implementation = RequestModelDeleteDTO.class))
+            )
+            @RequestBody List<RequestModelDeleteDTO> dtos,
+            HttpServletRequest request){
         try{
-            /// TODO : СДЕЛАТЬ ПОЛУЧЕНИЕ ПО АЙДИ БЛЯТЬ НАХУЙ //есть
             var requests = _requestRepository.findAllById(dtos.stream().map(x -> x.getId()).collect(Collectors.toList()));
 
 
@@ -122,8 +160,8 @@ public class RequestController {
                         return ResponseEntity.badRequest().body("you can delete only yours request");
 
                 List<Long> ids = dtos.stream()
-                                .map(dto -> dto.getId())
-                                        .collect(Collectors.toList());
+                        .map(dto -> dto.getId())
+                        .collect(Collectors.toList());
 
                 _requestRepository.deleteAllById(ids);
 
@@ -153,6 +191,15 @@ public class RequestController {
     }
 
     @GetMapping("/get-requests")
+    @Operation(
+            summary = "Получение запросов по проекту",
+            description = "Возвращает список запросов для текущей компании"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
     public ResponseEntity<?> getRequestsByProjectName(HttpServletRequest request){
         try{
 
@@ -168,7 +215,20 @@ public class RequestController {
     }
 
     @PostMapping("/approve-request/{requestId}")
-    public ResponseEntity<?> approveRequest(@PathVariable Long requestId, HttpServletRequest request){
+    @Operation(
+            summary = "Утверждение запроса",
+            description = "Утверждает запрос с указанным ID. Требуются права REQUEST_WORK или APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Запрос успешно утвержден"),
+            @ApiResponse(responseCode = "400", description = "Невалидный ID или запрос уже утвержден"),
+            @ApiResponse(responseCode = "401", description = "Недостаточно прав"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    public ResponseEntity<?> approveRequest(
+            @Parameter(description = "ID запроса для утверждения", required = true)
+            @PathVariable Long requestId,
+            HttpServletRequest request){
         try{
             if(requestId == null)
                 return ResponseEntity.badRequest().body("id cannot be null");
@@ -196,7 +256,20 @@ public class RequestController {
     }
 
     @PostMapping("/disapprove-request/{requestId}")
-    public ResponseEntity<?> disapproveRequest(@PathVariable Long requestId, HttpServletRequest request){
+    @Operation(
+            summary = "Отклонение запроса",
+            description = "Отклоняет запрос с указанным ID. Требуются права REQUEST_WORK или APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Запрос успешно отклонен"),
+            @ApiResponse(responseCode = "400", description = "Невалидный ID"),
+            @ApiResponse(responseCode = "401", description = "Недостаточно прав"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    public ResponseEntity<?> disapproveRequest(
+            @Parameter(description = "ID запроса для отклонения", required = true)
+            @PathVariable Long requestId,
+            HttpServletRequest request){
         try{
             if(requestId == null)
                 return ResponseEntity.badRequest().body("id cannot be null");
@@ -222,6 +295,15 @@ public class RequestController {
     }
 
     @GetMapping("/get-requests-order-by-date-today")
+    @Operation(
+            summary = "Получение запросов за сегодня",
+            description = "Возвращает запросы текущей компании за сегодняшний день"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
     public ResponseEntity<?> getRequestsOrderByDateToday(HttpServletRequest request){
         try {
 
@@ -237,6 +319,15 @@ public class RequestController {
     }
 
     @GetMapping("/get-requests-order-by-date-week")
+    @Operation(
+            summary = "Получение запросов за неделю",
+            description = "Возвращает запросы текущей компании за текущую неделю"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
     public ResponseEntity<?> getRequestsOrderByDateWeek(HttpServletRequest request){
         try{
 
@@ -251,8 +342,48 @@ public class RequestController {
         }
     }
 
+    @GetMapping("/get-requests-order-by-month")
+    @Operation(
+            summary = "Получение запросов за месяц",
+            description = "Возвращает запросы текущей компании за текущий месяц"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    public ResponseEntity<?> getRequestsOrderByMonth(HttpServletRequest request){
+        try {
+            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+            if(requests.isEmpty())
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+
+            return ResponseEntity.ok().body(_timeService.filterByCurrentMonth(requests));
+        } catch (Exception ex){
+            log.error(ex.getMessage());
+            return ResponseEntity.status(500).body("Logic error");
+        }
+    }
+
     @PostMapping("/get-requests-order-by-dates")
-    public ResponseEntity<?> getRequestsOrderByDates(@RequestBody SortByDateDTO dto, HttpServletRequest request){
+    @Operation(
+            summary = "Получение запросов по диапазону дат",
+            description = "Возвращает запросы текущей компании в указанном диапазоне дат"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "400", description = "Невалидные даты"),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    public ResponseEntity<?> getRequestsOrderByDates(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Диапазон дат для фильтрации",
+                    required = true,
+                    content = @Content(schema = @Schema(implementation = SortByDateDTO.class))
+            )
+            @RequestBody SortByDateDTO dto,
+            HttpServletRequest request){
         try {
             if(!dto.isValid())
                 return ResponseEntity.badRequest().body("dto is invalid");
@@ -268,9 +399,20 @@ public class RequestController {
         }
     }
 
-
     @GetMapping("/get-requests-order-by-date-quarter/{numberOfQuarter}")
-    public ResponseEntity<?> getRequestsOrderByDateQuarter(@PathVariable int numberOfQuarter, HttpServletRequest request){
+    @Operation(
+            summary = "Получение запросов за квартал",
+            description = "Возвращает запросы текущей компании за указанный квартал"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    public ResponseEntity<?> getRequestsOrderByDateQuarter(
+            @Parameter(description = "Номер квартала (1-4)", required = true)
+            @PathVariable int numberOfQuarter,
+            HttpServletRequest request){
         try{
 
             var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
@@ -284,8 +426,20 @@ public class RequestController {
         }
     }
 
-    @GetMapping("/get-operations-by-project/{projectName}") //получение операций по проекту
-    public ResponseEntity<?> getProjectOperations(@PathVariable String projectName, HttpServletRequest request){
+    @GetMapping("/get-operations-by-project/{projectName}")
+    @Operation(
+            summary = "Получение операций по проекту",
+            description = "Возвращает утвержденные операции (запросы) для указанного проекта"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Операции успешно получены"),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    public ResponseEntity<?> getProjectOperations(
+            @Parameter(description = "Название проекта", required = true)
+            @PathVariable String projectName,
+            HttpServletRequest request){
         try {
             var requests = _requestRepository.findByProjectNameAndCompanyId(projectName, Long.parseLong(request.getHeader("X-Company-Id")));
             if(requests.isEmpty())
@@ -303,6 +457,15 @@ public class RequestController {
     }
 
     @GetMapping("/get-requests-order-by-date-year")
+    @Operation(
+            summary = "Получение запросов за год",
+            description = "Возвращает запросы текущей компании за текущий год"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
     public ResponseEntity<?> getRequestsOrderByYear(HttpServletRequest request){
         try{
 
@@ -317,9 +480,16 @@ public class RequestController {
         }
     }
 
-
-
-    @GetMapping("/get-company-requests") //получение всех запросов по компании
+    @GetMapping("/get-company-requests")
+    @Operation(
+            summary = "Получение всех запросов компании",
+            description = "Возвращает все запросы текущей компании"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
     public ResponseEntity<?> getCompanyRequests(HttpServletRequest request){
         try {
 
@@ -335,6 +505,15 @@ public class RequestController {
     }
 
     @GetMapping("/get-company-operations")
+    @Operation(
+            summary = "Получение всех операций компании",
+            description = "Возвращает все утвержденные операции (запросы) текущей компании"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Операции успешно получены"),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
     public ResponseEntity<?> getCompanyOperations(HttpServletRequest request){
         try{
 
@@ -349,9 +528,21 @@ public class RequestController {
         }
     }
 
-
     @GetMapping("/get-project-statistic/{projectName}")
-    public ResponseEntity<?> getProjectStatistic(@PathVariable String projectName, HttpServletRequest request){
+    @Operation(
+            summary = "Получение статистики по проекту",
+            description = "Возвращает статистику по операциям указанного проекта"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Статистика успешно получена",
+                    content = @Content(schema = @Schema(implementation = StatDTO.class))),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    public ResponseEntity<?> getProjectStatistic(
+            @Parameter(description = "Название проекта", required = true)
+            @PathVariable String projectName,
+            HttpServletRequest request){
         try {
 
             var projectOperations = _requestRepository.findByProjectNameAndCompanyId(projectName, Long.parseLong(request.getHeader("X-Company-Id")));
@@ -366,6 +557,7 @@ public class RequestController {
             return ResponseEntity.status(500).body("Logic error");
         }
     }
+
 }
 
 
@@ -373,5 +565,7 @@ public class RequestController {
 ///TODO : ОПЕРАЦИИ ТОЛЬКО АПРУВНУТЫЕ МОГУТ БЫТЬ //есть
 ///TODO : ЗАЯВКИ ВСЕ МОГУТ БЫТЬ (ЛЮБОЙ СТАТУС МОЖЕТ БЫТЬ) //есть
 ///TODO : ПОИСК ЗАЯВОК НЕ ДОЛЖЕН БЫ ПО ПРОЕКТУ (ДОЛЖЕН БЫТЬ ПРОСТО ЗАПРОС НА ВСЕ МАТЬ ТВОЮ ЗАПРОСЫ БЛЯ) //есть
-/// TODO : СДЕЛАТЬ ВАЛИДАЦИЮ НА СТАТУС ЗАЯВКИ  (ЕСЛИ ПОПЫТАТЬСЯ ПОВТОРНО АПРУВНУТЬ АПРУВНУТУЮ ЗАЯВКУ)
+/// TODO : СДЕЛАТЬ ВАЛИДАЦИЮ НА СТАТУС ЗАЯВКИ  (ЕСЛИ ПОПЫТАТЬСЯ ПОВТОРНО АПРУВНУТЬ АПРУВНУТУЮ ЗАЯВКУ) //есть
 /// TODO : СДЕЛАТЬ ФИЛЬТРАЦИЮ ПО МЕСЯЦУ //есть
+
+///TODO : ДОБАВИТЬ БЛОКИ СТАТИСТИКИ
