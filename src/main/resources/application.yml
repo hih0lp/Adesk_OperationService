@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/Testus
-    username: postgres
-    password: aternosru123
+    url: jdbc:postgresql://localhost:5432/ADESK
+    username: admin
+    password: Tandem_2025
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
