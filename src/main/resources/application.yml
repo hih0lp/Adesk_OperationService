@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/ADESK
-    username: admin
-    password: Tandem_2025
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -24,4 +24,4 @@ spring:
       mappings:
         enabled: true
 server:
-  port: 8087
+  port: ${SERVER_PORT}
