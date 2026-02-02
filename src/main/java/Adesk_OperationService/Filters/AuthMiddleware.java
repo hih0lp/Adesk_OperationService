@@ -31,7 +31,7 @@ public class AuthMiddleware extends OncePerRequestFilter {
         if(request.getHeader("X-Authenticated") == null || request.getHeader("X-Authenticated").isEmpty()){
             response.setStatus(HttpServletResponse.SC_BAD_GATEWAY);
             response.setContentType("application/json");
-            response.getWriter().write("{\"error\": \"Request must come from gateway\"}");
+            response.getWriter().write("{\"error\": \"Request must come from gateway idi nahuy\"}");
             return;
         }
 
