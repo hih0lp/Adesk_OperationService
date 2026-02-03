@@ -1,5 +1,19 @@
-services:
-  operation:
-    image: adesk_operation_service
-    ports:
-      - "8087:8087"
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update  # ← ИЗМЕНИТЕ validate НА update!
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  session:
+    store-type: none
+
+server:
+  port: ${SERVER_PORT}
