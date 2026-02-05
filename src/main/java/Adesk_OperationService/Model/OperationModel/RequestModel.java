@@ -22,8 +22,8 @@ public class RequestModel {
     @Column(name = "type_of_operation")
     private String typeOfOperation; //income - outcome - transfer
 
-    @Column(name = "project_name")
-    private String projectName;
+    @Column(name = "project_id")
+    private Long projectId;
 
     @Column(name = "name_of_counterparty")
     private String nameOfCounterparty;
@@ -31,8 +31,8 @@ public class RequestModel {
     @Column(name = "sum")
     private Long sum;
 
-    @Column(name = "name")
-    private String name;
+//    @Column(name = "name")
+//    private String name;
 
     @Column(name = "created_at")
     private ZonedDateTime createdAt;

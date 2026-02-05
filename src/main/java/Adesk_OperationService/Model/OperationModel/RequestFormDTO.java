@@ -9,7 +9,7 @@ import java.util.List;
 public class RequestFormDTO {
     private String description;
     private String typeOfOperation;
-    private String projectName;
+    private String projectId;
     private String nameOfCounterparty;
     private Long sum;
     private String name;
@@ -19,7 +19,7 @@ public class RequestFormDTO {
     public boolean isValid() {
         return description != null && !description.trim().isEmpty() &&
                 typeOfOperation != null && !typeOfOperation.trim().isEmpty() &&
-                projectName != null && !projectName.trim().isEmpty() &&
+                projectId != null && !projectId.trim().isEmpty() &&
                 nameOfCounterparty != null && !nameOfCounterparty.trim().isEmpty() &&
                 sum != null && sum != 0;
     }

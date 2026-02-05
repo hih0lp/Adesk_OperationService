@@ -63,11 +63,11 @@ public class RequestController {
             var newRequest = new RequestModel();
             newRequest.setTypeOfOperation(form.getTypeOfOperation());
             newRequest.setDescription(form.getDescription());
-            newRequest.setProjectName(form.getProjectName());
+            newRequest.setProjectId(form.getProjectId());
             newRequest.setCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
             newRequest.setNameOfCounterparty(form.getNameOfCounterparty());
             newRequest.setCreatorEmail(request.getHeader("X-User-Email"));
-            newRequest.setName(form.getName());
+//            newRequest.setName(form.getName());
             newRequest.setCreatorLogin(form.getResponsibleLogin());
             newRequest.setCreatedAt(ZonedDateTime.now());
             newRequest.setSum(form.getSum());

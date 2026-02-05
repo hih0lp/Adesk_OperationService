@@ -29,7 +29,7 @@ public class FileModel {
 
     @Lob
     @Basic(fetch = FetchType.LAZY)
-    @Column(name = "content", columnDefinition = "bytea")  
+    @Column(name = "content", columnDefinition = "bytea")
     private byte[] content;
 
     @Column(name = "user_email", nullable = false)
