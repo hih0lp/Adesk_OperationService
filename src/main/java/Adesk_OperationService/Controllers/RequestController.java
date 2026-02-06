@@ -420,10 +420,10 @@ public class RequestController {
     })
     public ResponseEntity<?> getProjectOperations(
             @Parameter(description = "Название проекта", required = true)
-            @PathVariable String projectName,
+            @PathVariable Long projectId,
             HttpServletRequest request){
         try {
-            var requests = _requestRepository.findByProjectNameAndCompanyId(projectName, Long.parseLong(request.getHeader("X-Company-Id")));
+            var requests = _requestRepository.findByProjectIdAndCompanyId(projectId, Long.parseLong(request.getHeader("X-Company-Id")));
             if(requests.isEmpty())
                 return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
@@ -523,11 +523,11 @@ public class RequestController {
     })
     public ResponseEntity<?> getProjectStatistic(
             @Parameter(description = "Название проекта", required = true)
-            @PathVariable String projectName,
+            @PathVariable Long projectId,
             HttpServletRequest request){
         try {
 
-            var projectOperations = _requestRepository.findByProjectNameAndCompanyId(projectName, Long.parseLong(request.getHeader("X-Company-Id")));
+            var projectOperations = _requestRepository.findByProjectIdAndCompanyId(projectId, Long.parseLong(request.getHeader("X-Company-Id")));
             StatDTO stat = new StatDTO();
             stat.setRevenue(projectOperations.stream().filter(x -> x.getSum() > 0).mapToDouble(x -> x.getSum()).sum());
             stat.setProfit(projectOperations.stream().mapToDouble(x -> x.getSum()).sum());
