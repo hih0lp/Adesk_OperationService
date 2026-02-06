@@ -9,7 +9,7 @@ import java.util.Optional;
 
 public interface RequestRepository extends JpaRepository<RequestModel, Long> {
 //    Optional<RequestModel> findByCompanyName(String companyName);
-    Optional<RequestModel> findByNameAndProjectNameAndCompanyId(String name, String projectName, Long companyName);
+//    Optional<RequestModel> findByNameAndProjectNameAndCompanyId(String name, String projectName, Long companyName);
 //    List<RequestModel> findByProjectName(String projectName);
     List<RequestModel> findByProjectIdAndCompanyId(Long projectId, Long companyId);
     List<RequestModel> findByCompanyId(Long companyId);
