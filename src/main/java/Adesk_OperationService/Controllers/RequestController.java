@@ -185,11 +185,11 @@ public class RequestController {
     public ResponseEntity<?> getRequestsByProjectName(HttpServletRequest request){
         try{
 
-            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-            if(requests.isEmpty())
-                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+//            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+//            if(requests.isEmpty())
+//                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            return ResponseEntity.ok().body(requests);
+            return ResponseEntity.ok().body("HELLO WORLD");
         } catch(Exception ex){
             log.error(ex.getMessage());
             return ResponseEntity.status(500).body("Logic error");
