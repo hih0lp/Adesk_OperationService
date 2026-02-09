@@ -54,12 +54,12 @@ public class RequestModel {
     @Enumerated(EnumType.STRING)
     private RequestStatuses approvedStatus;
 
-    @JsonIgnore
+//    @JsonIgnore
     @OneToMany(
             mappedBy = "request",
             cascade = CascadeType.ALL, // При удалении request удаляются все связанные файлы
             orphanRemoval = true,      // При отсоединении файла от request - удаляем файл
-            fetch = FetchType.LAZY     // Ленивая загрузка файлов
+            fetch = FetchType.EAGER     // Ленивая загрузка файлов
     )
     private List<FileModel> files = new ArrayList<>();
 
