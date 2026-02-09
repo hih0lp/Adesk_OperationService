@@ -27,7 +27,7 @@ public class FileModel {
     @Column(name = "file_size", nullable = false)
     private Long fileSize;
 
-    @Lob
+//    @Lob
     @Basic(fetch = FetchType.LAZY)
     @Column(name = "content", columnDefinition = "bytea")
     private byte[] content;
