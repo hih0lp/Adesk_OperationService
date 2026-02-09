@@ -5,8 +5,8 @@ import Adesk_OperationService.Model.FileModel;
 import Adesk_OperationService.Model.OperationModel.*;
 import Adesk_OperationService.Model.StatDTO;
 import Adesk_OperationService.Repository.RequestRepository;
+import Adesk_OperationService.Services.RequestService;
 import Adesk_OperationService.Services.TimeService;
-import io.swagger.v3.core.util.Json;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -31,18 +31,21 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/requests")
 @RequiredArgsConstructor
+//@RestControllerAdvice
 @Tag(name = "Управление запросами", description = "API для работы с запросами на операции")
 @SecurityRequirement(name = "bearerAuth")
 public class RequestController {
     private final Logger log = LoggerFactory.getLogger(RequestController.class);
     private final RequestRepository _requestRepository;
     private final TimeService _timeService;
+    private final RequestService requestService;
+
 
     @PostMapping(value = "/create-request", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Transactional
@@ -50,66 +53,24 @@ public class RequestController {
             summary = "Создание нового запроса с файлами",
             description = "Создает новый запрос на операцию с прикрепленными файлами. Требуется право CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE"
     )
-    public ResponseEntity<?> createOperationAsync(
+    public CompletableFuture<ResponseEntity<?>> createRequestAsync(
             @ModelAttribute RequestFormDTO form,
             HttpServletRequest request) {
 
-        try {
-            if(!form.isValid())
-                return ResponseEntity.badRequest().body("form data is invalid");
+        if (!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
+                .anyMatch(s -> s.equals("CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE")))
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights"));
 
-            if(!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
-                    .anyMatch(s -> s.equals("CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE")))
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights");
+        RequestContext rContext = new RequestContext(
+                Long.parseLong(request.getHeader("X-Company-Id")),
+                request.getHeader("X-User-Email")
+        );
 
-            var newRequest = new RequestModel();
-            newRequest.setTypeOfOperation(form.getTypeOfOperation());
-            newRequest.setDescription(form.getDescription());
-            newRequest.setProjectId(form.getProjectId());
-            newRequest.setCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-            newRequest.setNameOfCounterparty(form.getNameOfCounterparty());
-            newRequest.setCreatorEmail(request.getHeader("X-User-Email"));
-//            newRequest.setName(form.getName());
-            newRequest.setCreatorLogin(form.getResponsibleLogin());
-            newRequest.setCreatedAt(ZonedDateTime.now());
-            newRequest.setSum(form.getSum());
-            newRequest.setApprovedStatus(RequestStatuses.APPROVING);    //В СЛУЧАЕ ЧЕГО МОЖНО УБРАТЬ КАКИЕ-ТО ПОЛЯ ИЗ ФОРМЫ И НЕ ДАВАТЬ ЕЮ ВСЮ ЗАПОЛНЯТЬ
-            if (form.getFiles() != null && !form.getFiles().isEmpty()) {
-                List<FileModel> fileModels = new ArrayList<>();
-
-                for (MultipartFile multipartFile : form.getFiles()) {
-                    if (!multipartFile.isEmpty()) {
-                        FileModel fileModel = createFileModel(multipartFile, newRequest,
-                                request.getHeader("X-User-Email"));
-                        fileModels.add(fileModel);
-                    }
-                }
-                newRequest.setFiles(fileModels);
-            }
-
-            _requestRepository.save(newRequest);
-            return ResponseEntity.ok().body("successfully creating");
-
-        } catch (Exception ex) {
-            log.error(ex.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Logic error");
-        }
+        return requestService.createRequestAsync(form, rContext)
+                .thenApply(ResponseEntity::ok);
     }
 
-    private FileModel createFileModel(MultipartFile multipartFile,
-                                      RequestModel request,
-                                      String userEmail) throws IOException {
 
-        return FileModel.builder()
-                .originalFilename(multipartFile.getOriginalFilename())
-                .fileSize(multipartFile.getSize())
-                .content(multipartFile.getBytes())
-                .userEmail(userEmail)
-                .companyId(request.getCompanyId())
-                .request(request) // Устанавливаем связь с Request
-                .isCompressed(false)
-                .build();
-    }
 
     @DeleteMapping("/delete-requests")
     @Transactional
@@ -187,12 +148,11 @@ public class RequestController {
     public ResponseEntity<?> getRequestsByProjectName(HttpServletRequest request){
         try{
 
-//            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-//            if(requests.isEmpty())
-//                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+            if(requests.isEmpty())
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-//            var json =
-            return ResponseEntity.ok().body(Map.of("message", "hello world"));
+            return ResponseEntity.ok().body(requests);
         } catch(Exception ex){
             log.error(ex.getMessage());
             return ResponseEntity.status(500).body("Logic error");
