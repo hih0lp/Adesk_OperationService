@@ -2,6 +2,7 @@ package Adesk_OperationService.Model.OperationModel;
 
 import Adesk_OperationService.Constants.RequestStatuses;
 import Adesk_OperationService.Model.FileModel;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.ZonedDateTime;
@@ -53,6 +54,7 @@ public class RequestModel {
     @Enumerated(EnumType.STRING)
     private RequestStatuses approvedStatus;
 
+    @JsonIgnore
     @OneToMany(
             mappedBy = "request",
             cascade = CascadeType.ALL, // При удалении request удаляются все связанные файлы
