@@ -1,6 +1,7 @@
 package Adesk_OperationService.Model;
 
 import Adesk_OperationService.Model.OperationModel.RequestModel;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -38,6 +39,7 @@ public class FileModel {
     @Column(name = "company_id", nullable = false)
     private Long companyId;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "request_id", nullable = false)
     private RequestModel request;
