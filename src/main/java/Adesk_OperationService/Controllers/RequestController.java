@@ -131,7 +131,7 @@ public class RequestController {
                 "attachment; filename=\"" + downloadName + "\"");
 
         return CompletableFuture.completedFuture(
-                ResponseEntity.ok().headers(headers).body(fileBytes));
+                ResponseEntity.ok().body(downloadName)); //.headers(headers)
     }
 
 
