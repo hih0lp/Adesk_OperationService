@@ -113,12 +113,14 @@ public class RequestController {
                 .encode(originalFilename, StandardCharsets.UTF_8)
                 .replace("+", "%20");
 
-        String extension = "";
-        int dot = originalFilename.lastIndexOf('.');
-        if (dot > 0) {
-            extension = originalFilename.substring(dot);
+        String asciiFilename = java.text.Normalizer
+                .normalize(originalFilename, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
+                .replaceAll("[^a-zA-Z0-9._-]", "_");
+
+        if (asciiFilename.isBlank()) {
+            asciiFilename = "document.docx";
         }
-        String asciiFilename = "file" + extension;
 
         MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
         String storedName = file.getStoredFilename();
@@ -148,6 +150,7 @@ public class RequestController {
                 new ResponseEntity<>(content, headers, HttpStatus.OK)
         );
     }
+
 
 
 
