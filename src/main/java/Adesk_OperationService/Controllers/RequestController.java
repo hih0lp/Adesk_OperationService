@@ -80,12 +80,13 @@ public class RequestController {
     }
 
 
+
     @GetMapping("/download-file/{id}")
     public CompletableFuture<ResponseEntity<byte[]>> downloadFile(
             @PathVariable Long id,
             HttpServletRequest request
     ) {
-        // проверка прав
+        // 1️⃣ Проверка прав
         String permissions = request.getHeader("X-User-Permissions");
         if (permissions == null || Arrays.stream(permissions.split(","))
                 .noneMatch("REQUEST_WORK"::equals)) {
@@ -95,23 +96,33 @@ public class RequestController {
             );
         }
 
+        // 2️⃣ Получаем файл
         var fileOpt = fileRepository.findById(id);
         if (fileOpt.isEmpty()) {
             return CompletableFuture.completedFuture(
-                    ResponseEntity.badRequest().build()
+                    ResponseEntity.notFound().build()
             );
         }
 
         var file = fileOpt.get();
-        byte[] fileBytes = file.getContent();
+        byte[] content = file.getContent();
 
-        // имя файла — БЕЗ перекодировок
-        String downloadName = file.getOriginalFilename();
-        if (downloadName == null || downloadName.isBlank()) {
-            downloadName = "document.docx";
+        // 3️⃣ Имя файла
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            originalFilename = "document.bin";
         }
 
-        // content-type
+        // ASCII fallback (обязательно)
+        String asciiFilename = originalFilename
+                .replaceAll("[^a-zA-Z0-9._-]", "_");
+
+        // UTF-8 имя
+        String encodedFilename = URLEncoder
+                .encode(originalFilename, StandardCharsets.UTF_8)
+                .replace("+", "%20");
+
+        // 4️⃣ Content-Type
         MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
         String storedName = file.getStoredFilename();
 
@@ -126,24 +137,24 @@ public class RequestController {
             }
         }
 
-        // заголовки
+        // 5️⃣ Заголовки
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(mediaType);
-        headers.setContentLength(fileBytes.length);
-
-        String encodedFilename = URLEncoder
-                .encode(downloadName, StandardCharsets.UTF_8)
-                .replace("+", "%20");
+        headers.setContentLength(content.length);
 
         headers.add(
                 HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename*=UTF-8''" + encodedFilename
+                "attachment; " +
+                        "filename=\"" + asciiFilename + "\"; " +
+                        "filename*=UTF-8''" + encodedFilename
         );
 
         return CompletableFuture.completedFuture(
-                new ResponseEntity<>(fileBytes, headers, HttpStatus.OK)
+                new ResponseEntity<>(content, headers, HttpStatus.OK)
         );
     }
+
+
 
 
 
