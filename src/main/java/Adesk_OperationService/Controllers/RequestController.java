@@ -96,32 +96,39 @@ public class RequestController {
 
         HttpHeaders headers = new HttpHeaders();
 
-        String filename = file.getStoredFilename();
+        // 1. Фиксим кодировку originalName
+        String originalName = file.getOriginalFilename();
+        String downloadName;
 
-        // Извлекаем расширение
-        String extension = "";
-        if (filename != null && filename.contains(".")) {
-            extension = filename.substring(filename.lastIndexOf("."));
+        if (originalName != null && originalName.contains("Ð")) {
+            try {
+                downloadName = new String(originalName.getBytes("ISO-8859-1"), "UTF-8");
+            } catch (Exception e) {
+                downloadName = "document.docx";
+            }
+        } else if (originalName != null) {
+            downloadName = originalName;
+        } else {
+            downloadName = "document.docx";
         }
 
-        String downloadName = file.getOriginalFilename();
-
-        // Определяем Content-Type
+        // 2. Определяем Content-Type по storedName
+        String storedName = file.getStoredFilename();
         String contentType = "application/octet-stream";
-        if (extension.toLowerCase().equals(".webp")) {
-            contentType = "image/webp";
-        } else if (extension.toLowerCase().equals(".jpg") || extension.toLowerCase().equals(".jpeg")) {
-            contentType = "image/jpeg";
-        } else if (extension.toLowerCase().equals(".png")) {
-            contentType = "image/png";
-        } else if (extension.toLowerCase().equals(".pdf")) {
-            contentType = "application/pdf";
-        } else if (extension.toLowerCase().equals(".docx")) {
-            contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+        if (storedName != null) {
+            if (storedName.endsWith(".docx")) {
+                contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            } else if (storedName.endsWith(".pdf")) {
+                contentType = "application/pdf";
+            } else if (storedName.endsWith(".webp")) {
+                contentType = "image/webp";
+            }
         }
 
         headers.setContentType(MediaType.parseMediaType(contentType));
-        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + downloadName + "\"");
+        headers.set(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"" + downloadName + "\"");
 
         return CompletableFuture.completedFuture(
                 ResponseEntity.ok().headers(headers).body(fileBytes));
