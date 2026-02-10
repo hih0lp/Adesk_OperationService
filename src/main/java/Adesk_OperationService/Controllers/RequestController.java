@@ -26,14 +26,12 @@ import org.apache.coyote.Response;
 import org.apache.tomcat.util.http.fileupload.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.bind.annotation.*;
 
 import javax.tools.JavaFileManager;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
@@ -81,28 +79,34 @@ public class RequestController {
     }
 
 
-    @GetMapping(value = "/download-file/{id}")
-    public CompletableFuture<ResponseEntity<?>> downloadFile(@PathVariable Long id , HttpServletRequest request){
-        if(!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
-                .anyMatch(s -> s.equals("REQUEST_WORK")))
-            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights"));
+    @GetMapping("/download-file/{id}")
+    public CompletableFuture<ResponseEntity<byte[]>> downloadFile(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+        if (!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
+                .anyMatch(s -> s.equals("REQUEST_WORK"))) {
+            return CompletableFuture.completedFuture(
+                    ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            );
+        }
 
         var fileOpt = fileRepository.findById(id);
-        if(fileOpt.isEmpty())
-            return CompletableFuture.completedFuture(ResponseEntity.badRequest().body("no file"));
+        if (fileOpt.isEmpty()) {
+            return CompletableFuture.completedFuture(
+                    ResponseEntity.badRequest().build()
+            );
+        }
 
         var file = fileOpt.get();
         byte[] fileBytes = file.getContent();
 
-        HttpHeaders headers = new HttpHeaders();
-
-        // 1. Фиксим кодировку originalName
         String originalName = file.getOriginalFilename();
         String downloadName;
 
         if (originalName != null && originalName.contains("Ð")) {
             try {
-                downloadName = new String(originalName.getBytes("ISO-8859-1"), "UTF-8");
+                downloadName = new String(originalName.getBytes("ISO-8859-1"), StandardCharsets.UTF_8);
             } catch (Exception e) {
                 downloadName = "document.docx";
             }
@@ -112,27 +116,34 @@ public class RequestController {
             downloadName = "document.docx";
         }
 
-        // 2. Определяем Content-Type по storedName
         String storedName = file.getStoredFilename();
-        String contentType = "application/octet-stream";
+        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
 
         if (storedName != null) {
             if (storedName.endsWith(".docx")) {
-                contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                mediaType = MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
             } else if (storedName.endsWith(".pdf")) {
-                contentType = "application/pdf";
+                mediaType = MediaType.APPLICATION_PDF;
             } else if (storedName.endsWith(".webp")) {
-                contentType = "image/webp";
+                mediaType = MediaType.parseMediaType("image/webp");
             }
         }
 
-        headers.setContentType(MediaType.parseMediaType(contentType));
-        headers.set(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=\"" + downloadName + "\"");
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(mediaType);
+        headers.setContentDisposition(
+                ContentDisposition.attachment()
+                        .filename(downloadName, StandardCharsets.UTF_8)
+                        .build()
+        );
+        headers.setContentLength(fileBytes.length);
 
         return CompletableFuture.completedFuture(
-                ResponseEntity.ok().body(downloadName)); //.headers(headers)
+                new ResponseEntity<>(fileBytes, headers, HttpStatus.OK)
+        );
     }
+
 
 
     @DeleteMapping("/delete-requests")
