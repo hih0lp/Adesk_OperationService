@@ -54,6 +54,13 @@ public class FileModel {
     @Column(name = "href")
     private String href;
 
+    @PostPersist
+    protected void generateHref(){
+        if(this.href == null && this.id != null){
+            this.href = "https://gateway.marinafin.ru/api/gateway/requests/download-file/" + this.id; //создаю ссылку уже после закачивания в БД
+        }
+    }
+
     @PrePersist
     protected void onCreate() {
         if (storedFilename == null) {

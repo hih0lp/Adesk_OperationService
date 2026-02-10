@@ -50,7 +50,6 @@
                             try {
                                 FileModel fileModel = createFileModel(multipartFile, newRequest,
                                         requestContext.userEmail());
-                                fileModel.setHref("https://gateway.marinafin.ru/api/gateway/requests/download-file/" + fileModel.getId());
                                 fileModels.add(fileModel);
                             } catch (Exception e){
                                 throw new RuntimeException("Failed to proccess file");
