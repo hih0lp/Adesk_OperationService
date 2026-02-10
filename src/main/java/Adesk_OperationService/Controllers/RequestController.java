@@ -34,8 +34,6 @@ import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.bind.annotation.*;
 
 import javax.tools.JavaFileManager;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
@@ -84,43 +82,32 @@ public class RequestController {
 
 
     @GetMapping(value = "/download-file/{id}")
-    public CompletableFuture<ResponseEntity<?>> downloadFile(@PathVariable Long id, HttpServletRequest request) {
+    public ResponseEntity<?> downloadFile(@PathVariable Long id, HttpServletRequest request) {
         if (!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
                 .anyMatch(s -> s.equals("REQUEST_WORK"))) {
-            return CompletableFuture.completedFuture(
-                    ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights");
         }
 
         var fileOpt = fileRepository.findById(id);
         if (fileOpt.isEmpty()) {
-            return CompletableFuture.completedFuture(
-                    ResponseEntity.badRequest().body("no file"));
+            return ResponseEntity.badRequest().body("no file");
         }
 
         var file = fileOpt.get();
-        byte[] fileBytes = file.getContent();
-
-        HttpHeaders headers = new HttpHeaders();
 
         String filename = file.getOriginalFilename();
-        if (filename != null && (filename.contains("Ð") || filename.contains("Ñ"))) {
+
+        if (filename != null && filename.contains("Ð")) {
             try {
                 filename = new String(filename.getBytes("ISO-8859-1"), "UTF-8");
             } catch (Exception ignored) {}
         }
 
-        String encodedFilename = filename != null ?
-                URLEncoder.encode(filename, StandardCharsets.UTF_8).replace("+", "%20") :
-                "file";
-
-        headers.set(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename*=UTF-8''" + encodedFilename);
-
-        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        headers.setContentLength(fileBytes.length);
-
-        return CompletableFuture.completedFuture(
-                ResponseEntity.ok().headers(headers).body(fileBytes));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(file.getContent());
     }
 
 
