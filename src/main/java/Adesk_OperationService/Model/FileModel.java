@@ -22,9 +22,11 @@ public class FileModel {
     @Column(name = "original_filename", nullable = false, length = 500)
     private String originalFilename;
 
+    @JsonIgnore
     @Column(name = "stored_filename", unique = true, length = 255)
     private String storedFilename;
 
+    @JsonIgnore
     @Column(name = "file_size", nullable = false)
     private Long fileSize;
 
@@ -34,10 +36,11 @@ public class FileModel {
     @Column(name = "content", columnDefinition = "bytea")
     private byte[] content;
 
+    @JsonIgnore
     @Column(name = "user_email", nullable = false)
     private String userEmail;
 
-
+    @JsonIgnore
     @Column(name = "company_id", nullable = false)
     private Long companyId;
 
@@ -46,9 +49,11 @@ public class FileModel {
     @JoinColumn(name = "request_id", nullable = false)
     private RequestModel request;
 
+    @JsonIgnore
     @Column(name = "is_compressed")
     private Boolean isCompressed = false;
 
+    @JsonIgnore
     @Column(name = "uploaded_at")
     private LocalDateTime uploadedAt;
 
