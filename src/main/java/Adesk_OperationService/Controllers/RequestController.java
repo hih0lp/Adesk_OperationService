@@ -82,73 +82,46 @@ public class RequestController {
 
 
     @GetMapping(value = "/download-file/{id}")
-    public CompletableFuture<ResponseEntity<?>> downloadFile(@PathVariable Long id, HttpServletRequest request) {
-        if (!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
-                .anyMatch(s -> s.equals("REQUEST_WORK"))) {
-            return CompletableFuture.completedFuture(
-                    ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights"));
-        }
+    public CompletableFuture<ResponseEntity<?>> downloadFile(@PathVariable Long id , HttpServletRequest request){
+        if(!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
+                .anyMatch(s -> s.equals("REQUEST_WORK")))
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights"));
 
         var fileOpt = fileRepository.findById(id);
-        if (fileOpt.isEmpty()) {
-            return CompletableFuture.completedFuture(
-                    ResponseEntity.badRequest().body("no file"));
-        }
+        if(fileOpt.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.badRequest().body("no file"));
 
         var file = fileOpt.get();
         byte[] fileBytes = file.getContent();
 
         HttpHeaders headers = new HttpHeaders();
 
-        // Берем имя файла
-        String filename = file.getOriginalFilename();
+        String filename = file.getStoredFilename();
 
-        // Определяем Content-Type по расширению
+        // Извлекаем расширение
+        String extension = "";
+        if (filename != null && filename.contains(".")) {
+            extension = filename.substring(filename.lastIndexOf("."));
+        }
+
+        String downloadName = file.getOriginalFilename();
+
+        // Определяем Content-Type
         String contentType = "application/octet-stream";
-        if (filename != null) {
-            String lowerName = filename.toLowerCase();
-
-            // Картинки
-            if (lowerName.endsWith(".webp")) contentType = "image/webp";
-            else if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) contentType = "image/jpeg";
-            else if (lowerName.endsWith(".png")) contentType = "image/png";
-            else if (lowerName.endsWith(".gif")) contentType = "image/gif";
-            else if (lowerName.endsWith(".bmp")) contentType = "image/bmp";
-            else if (lowerName.endsWith(".svg")) contentType = "image/svg+xml";
-
-                // Документы
-            else if (lowerName.endsWith(".pdf")) contentType = "application/pdf";
-            else if (lowerName.endsWith(".doc")) contentType = "application/msword";
-            else if (lowerName.endsWith(".docx")) contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-            else if (lowerName.endsWith(".xls")) contentType = "application/vnd.ms-excel";
-            else if (lowerName.endsWith(".xlsx")) contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-            else if (lowerName.endsWith(".ppt")) contentType = "application/vnd.ms-powerpoint";
-            else if (lowerName.endsWith(".pptx")) contentType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-
-                // Текстовые
-            else if (lowerName.endsWith(".txt")) contentType = "text/plain; charset=UTF-8";
-            else if (lowerName.endsWith(".csv")) contentType = "text/csv; charset=UTF-8";
-            else if (lowerName.endsWith(".html") || lowerName.endsWith(".htm")) contentType = "text/html; charset=UTF-8";
-            else if (lowerName.endsWith(".xml")) contentType = "application/xml";
-            else if (lowerName.endsWith(".json")) contentType = "application/json";
-
-                // Архивы
-            else if (lowerName.endsWith(".zip")) contentType = "application/zip";
-            else if (lowerName.endsWith(".rar")) contentType = "application/vnd.rar";
-            else if (lowerName.endsWith(".7z")) contentType = "application/x-7z-compressed";
-            else if (lowerName.endsWith(".tar")) contentType = "application/x-tar";
-            else if (lowerName.endsWith(".gz")) contentType = "application/gzip";
-
-                // Аудио/Видео
-            else if (lowerName.endsWith(".mp3")) contentType = "audio/mpeg";
-            else if (lowerName.endsWith(".mp4")) contentType = "video/mp4";
-            else if (lowerName.endsWith(".avi")) contentType = "video/x-msvideo";
-            else if (lowerName.endsWith(".mov")) contentType = "video/quicktime";
-            else if (lowerName.endsWith(".wav")) contentType = "audio/wav";
+        if (extension.toLowerCase().equals(".webp")) {
+            contentType = "image/webp";
+        } else if (extension.toLowerCase().equals(".jpg") || extension.toLowerCase().equals(".jpeg")) {
+            contentType = "image/jpeg";
+        } else if (extension.toLowerCase().equals(".png")) {
+            contentType = "image/png";
+        } else if (extension.toLowerCase().equals(".pdf")) {
+            contentType = "application/pdf";
+        } else if (extension.toLowerCase().equals(".docx")) {
+            contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
         }
 
         headers.setContentType(MediaType.parseMediaType(contentType));
-        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + downloadName + "\"");
 
         return CompletableFuture.completedFuture(
                 ResponseEntity.ok().headers(headers).body(fileBytes));
