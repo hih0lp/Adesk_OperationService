@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.HashMap;
 import java.util.Map;
 
-@RestControllerAdvice
+@RestControllerAdvice //слабо коннектится со сваггером
 @Hidden
 @Slf4j
 public class RequestControllerAdvice {

@@ -3,10 +3,9 @@
     import Adesk_OperationService.Constants.RequestStatuses;
     import Adesk_OperationService.Model.FileModel;
     import Adesk_OperationService.Model.OperationModel.RequestContext;
-    import Adesk_OperationService.Model.OperationModel.RequestFormDTO;
+    import Adesk_OperationService.Model.OperationModel.Request.RequestFormDTO;
     import Adesk_OperationService.Model.OperationModel.RequestModel;
     import Adesk_OperationService.Repository.RequestRepository;
-    import jakarta.servlet.http.HttpServletRequest;
     import lombok.RequiredArgsConstructor;
     import org.slf4j.Logger;
     import org.slf4j.LoggerFactory;
@@ -51,6 +50,7 @@
                             try {
                                 FileModel fileModel = createFileModel(multipartFile, newRequest,
                                         requestContext.userEmail());
+                                fileModel.setHref("https://gateway.marinafin.ru/api/gateway/requests/download-file/" + fileModel.getId());
                                 fileModels.add(fileModel);
                             } catch (Exception e){
                                 throw new RuntimeException("Failed to proccess file");

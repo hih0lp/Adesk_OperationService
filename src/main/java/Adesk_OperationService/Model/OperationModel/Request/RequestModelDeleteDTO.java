@@ -1,7 +1,5 @@
-package Adesk_OperationService.Model.OperationModel;
+package Adesk_OperationService.Model.OperationModel.Request;
 
-import Adesk_OperationService.Constants.RequestStatuses;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 

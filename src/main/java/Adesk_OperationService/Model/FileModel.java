@@ -29,6 +29,7 @@ public class FileModel {
     private Long fileSize;
 
 //    @Lob
+    @JsonIgnore
     @Basic(fetch = FetchType.LAZY)
     @Column(name = "content", columnDefinition = "bytea")
     private byte[] content;
@@ -49,6 +50,9 @@ public class FileModel {
 
     @Column(name = "uploaded_at")
     private LocalDateTime uploadedAt;
+
+    @Column(name = "href")
+    private String href;
 
     @PrePersist
     protected void onCreate() {

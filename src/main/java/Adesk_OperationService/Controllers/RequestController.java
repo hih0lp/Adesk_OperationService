@@ -1,9 +1,12 @@
 package Adesk_OperationService.Controllers;
 
 import Adesk_OperationService.Constants.RequestStatuses;
-import Adesk_OperationService.Model.FileModel;
 import Adesk_OperationService.Model.OperationModel.*;
+import Adesk_OperationService.Model.OperationModel.Request.RequestFormDTO;
+import Adesk_OperationService.Model.OperationModel.Request.RequestModelDeleteDTO;
+import Adesk_OperationService.Model.OperationModel.Request.SortByDateDTO;
 import Adesk_OperationService.Model.StatDTO;
+import Adesk_OperationService.Repository.FileRepository;
 import Adesk_OperationService.Repository.RequestRepository;
 import Adesk_OperationService.Services.RequestService;
 import Adesk_OperationService.Services.TimeService;
@@ -15,20 +18,23 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.apache.coyote.Response;
+import org.apache.tomcat.util.http.fileupload.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.time.ZonedDateTime;
-import java.util.ArrayList;
+import javax.tools.JavaFileManager;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -45,6 +51,8 @@ public class RequestController {
     private final RequestRepository _requestRepository;
     private final TimeService _timeService;
     private final RequestService requestService;
+    private final FileRepository fileRepository;
+//    private final
 
 
     @PostMapping(value = "/create-request", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -66,12 +74,31 @@ public class RequestController {
                 request.getHeader("X-User-Email")
         );
 
-        log.info("OKEYOKEYOKEYOKEY");
+//        log.info("OKEYOKEYOKEYOKEY");
 
         return requestService.createRequestAsync(form, rContext)
                 .thenApply(ResponseEntity::ok);
     }
 
+
+    @GetMapping(value = "/download-file/{id}")
+    public CompletableFuture<ResponseEntity<?>> downloadFile(@PathVariable Long id , HttpServletRequest request){
+        if(!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
+                .anyMatch(s -> s.equals("REQUEST_WORK")))
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights"));
+
+        var fileOpt = fileRepository.findById(id);
+        if(fileOpt.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.badRequest().body("no file"));
+
+        var file = fileOpt.get();
+        byte[] fileBytes = file.getContent();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.getOriginalFilename() + "\"");
+
+        return CompletableFuture.completedFuture(ResponseEntity.ok().headers(headers).body(fileBytes));
+    }
 
 
     @DeleteMapping("/delete-requests")
