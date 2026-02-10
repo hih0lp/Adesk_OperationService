@@ -104,24 +104,6 @@ public class RequestController {
         var file = fileOpt.get();
         byte[] content = file.getContent();
 
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || originalFilename.isBlank()) {
-            originalFilename = "document.docx";
-        }
-
-        String encodedFilename = URLEncoder
-                .encode(originalFilename, StandardCharsets.UTF_8)
-                .replace("+", "%20");
-
-        String asciiFilename = java.text.Normalizer
-                .normalize(originalFilename, java.text.Normalizer.Form.NFD)
-                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
-                .replaceAll("[^a-zA-Z0-9._-]", "_");
-
-        if (asciiFilename.isBlank()) {
-            asciiFilename = "document.docx";
-        }
-
         MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
         String storedName = file.getStoredFilename();
 
@@ -136,14 +118,17 @@ public class RequestController {
             }
         }
 
+        String extension = "";
+        if (storedName != null && storedName.contains(".")) {
+            extension = storedName.substring(storedName.lastIndexOf('.'));
+        }
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(mediaType);
         headers.setContentLength(content.length);
-        headers.add(
+        headers.set(
                 HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; " +
-                        "filename=\"" + asciiFilename + "\"; " +
-                        "filename*=UTF-8''" + encodedFilename
+                "attachment; filename=\"file" + extension + "\""
         );
 
         return CompletableFuture.completedFuture(

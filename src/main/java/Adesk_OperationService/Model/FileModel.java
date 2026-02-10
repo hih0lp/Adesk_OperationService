@@ -37,6 +37,7 @@ public class FileModel {
     @Column(name = "user_email", nullable = false)
     private String userEmail;
 
+
     @Column(name = "company_id", nullable = false)
     private Long companyId;
 
