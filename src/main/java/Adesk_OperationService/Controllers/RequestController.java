@@ -86,17 +86,14 @@ public class RequestController {
             @PathVariable Long id,
             HttpServletRequest request
     ) {
-        // 1️⃣ Проверка прав
         String permissions = request.getHeader("X-User-Permissions");
         if (permissions == null || Arrays.stream(permissions.split(","))
                 .noneMatch("REQUEST_WORK"::equals)) {
-
             return CompletableFuture.completedFuture(
                     ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
             );
         }
 
-        // 2️⃣ Получаем файл
         var fileOpt = fileRepository.findById(id);
         if (fileOpt.isEmpty()) {
             return CompletableFuture.completedFuture(
@@ -107,22 +104,22 @@ public class RequestController {
         var file = fileOpt.get();
         byte[] content = file.getContent();
 
-        // 3️⃣ Имя файла
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || originalFilename.isBlank()) {
-            originalFilename = "document.bin";
+            originalFilename = "document.docx";
         }
 
-        // ASCII fallback (обязательно)
-        String asciiFilename = originalFilename
-                .replaceAll("[^a-zA-Z0-9._-]", "_");
-
-        // UTF-8 имя
         String encodedFilename = URLEncoder
                 .encode(originalFilename, StandardCharsets.UTF_8)
                 .replace("+", "%20");
 
-        // 4️⃣ Content-Type
+        String extension = "";
+        int dot = originalFilename.lastIndexOf('.');
+        if (dot > 0) {
+            extension = originalFilename.substring(dot);
+        }
+        String asciiFilename = "file" + extension;
+
         MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
         String storedName = file.getStoredFilename();
 
@@ -137,11 +134,9 @@ public class RequestController {
             }
         }
 
-        // 5️⃣ Заголовки
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(mediaType);
         headers.setContentLength(content.length);
-
         headers.add(
                 HttpHeaders.CONTENT_DISPOSITION,
                 "attachment; " +
@@ -153,6 +148,7 @@ public class RequestController {
                 new ResponseEntity<>(content, headers, HttpStatus.OK)
         );
     }
+
 
 
 
