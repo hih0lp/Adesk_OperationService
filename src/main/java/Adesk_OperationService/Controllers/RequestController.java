@@ -31,6 +31,7 @@ import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.bind.annotation.*;
 
 import javax.tools.JavaFileManager;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
@@ -84,8 +85,11 @@ public class RequestController {
             @PathVariable Long id,
             HttpServletRequest request
     ) {
-        if (!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
-                .anyMatch(s -> s.equals("REQUEST_WORK"))) {
+        // проверка прав
+        String permissions = request.getHeader("X-User-Permissions");
+        if (permissions == null || Arrays.stream(permissions.split(","))
+                .noneMatch("REQUEST_WORK"::equals)) {
+
             return CompletableFuture.completedFuture(
                     ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
             );
@@ -101,23 +105,15 @@ public class RequestController {
         var file = fileOpt.get();
         byte[] fileBytes = file.getContent();
 
-        String originalName = file.getOriginalFilename();
-        String downloadName;
-
-        if (originalName != null && originalName.contains("Ð")) {
-            try {
-                downloadName = new String(originalName.getBytes("ISO-8859-1"), StandardCharsets.UTF_8);
-            } catch (Exception e) {
-                downloadName = "document.docx";
-            }
-        } else if (originalName != null) {
-            downloadName = originalName;
-        } else {
+        // имя файла — БЕЗ перекодировок
+        String downloadName = file.getOriginalFilename();
+        if (downloadName == null || downloadName.isBlank()) {
             downloadName = "document.docx";
         }
 
-        String storedName = file.getStoredFilename();
+        // content-type
         MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        String storedName = file.getStoredFilename();
 
         if (storedName != null) {
             if (storedName.endsWith(".docx")) {
@@ -130,19 +126,25 @@ public class RequestController {
             }
         }
 
+        // заголовки
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(mediaType);
-        headers.setContentDisposition(
-                ContentDisposition.attachment()
-                        .filename(downloadName, StandardCharsets.UTF_8)
-                        .build()
-        );
         headers.setContentLength(fileBytes.length);
+
+        String encodedFilename = URLEncoder
+                .encode(downloadName, StandardCharsets.UTF_8)
+                .replace("+", "%20");
+
+        headers.add(
+                HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename*=UTF-8''" + encodedFilename
+        );
 
         return CompletableFuture.completedFuture(
                 new ResponseEntity<>(fileBytes, headers, HttpStatus.OK)
         );
     }
+
 
 
 
