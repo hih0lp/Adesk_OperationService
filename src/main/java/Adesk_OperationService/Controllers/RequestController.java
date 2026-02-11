@@ -245,30 +245,25 @@ public class RequestController {
             @Parameter(description = "ID запроса для утверждения", required = true)
             @PathVariable Long requestId,
             HttpServletRequest request){
-        try{
-            if(requestId == null)
-                return ResponseEntity.badRequest().body("id cannot be null");
+        if(requestId == null)
+            return ResponseEntity.badRequest().body("id cannot be null");
 
-            if(!Arrays.stream(request.getHeader("X-User-Permissions")
-                    .split(",")).anyMatch(s -> s.equals("REQUEST_WORK") || s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE")))
-                return ResponseEntity.badRequest().body("no rights");
+        if(!Arrays.stream(request.getHeader("X-User-Permissions")
+                .split(",")).anyMatch(s -> s.equals("REQUEST_WORK") || s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE")))
+            return ResponseEntity.badRequest().body("no rights");
 
-            var requestOpt = _requestRepository.findById(requestId);
-            if(requestOpt.isEmpty())
-                return ResponseEntity.badRequest().body("request doesn't exist");
+        var requestOpt = _requestRepository.findById(requestId);
+        if(requestOpt.isEmpty())
+            return ResponseEntity.badRequest().body("request doesn't exist");
 
 
-            var req = requestOpt.get();
-            if(req.getApprovedStatus() == RequestStatuses.APPROVING)
-                return ResponseEntity.badRequest().body("request has been already approved");
-            req.setApprovedStatus(RequestStatuses.APPROVED);
-            _requestRepository.save(req);
+        var req = requestOpt.get();
+        if(req.getApprovedStatus() == RequestStatuses.APPROVING)
+            return ResponseEntity.badRequest().body("request has been already approved");
+        req.setApprovedStatus(RequestStatuses.APPROVED);
+        _requestRepository.save(req);
 
-            return ResponseEntity.ok().body("successfully approving");
-        } catch(Exception ex) {
-            log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
-        }
+        return ResponseEntity.ok().body("successfully approving");
     }
 
     @PostMapping("/disapprove-request/{requestId}")
@@ -286,28 +281,23 @@ public class RequestController {
             @Parameter(description = "ID запроса для отклонения", required = true)
             @PathVariable Long requestId,
             HttpServletRequest request){
-        try{
-            if(requestId == null)
-                return ResponseEntity.badRequest().body("id cannot be null");
+        if(requestId == null)
+            return ResponseEntity.badRequest().body("id cannot be null");
 
-            if(!Arrays.stream(request.getHeader("X-User-Permissions")
-                    .split(",")).anyMatch(s -> s.equals("REQUEST_WORK") || s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE")))
-                return ResponseEntity.badRequest().body("no rights");
+        if(!Arrays.stream(request.getHeader("X-User-Permissions")
+                .split(",")).anyMatch(s -> s.equals("REQUEST_WORK") || s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE")))
+            return ResponseEntity.badRequest().body("no rights");
 
-            var requestOpt = _requestRepository.findById(requestId);
-            if(requestOpt.isEmpty())
-                return ResponseEntity.badRequest().body("request doesn't exist");
+        var requestOpt = _requestRepository.findById(requestId);
+        if(requestOpt.isEmpty())
+            return ResponseEntity.badRequest().body("request doesn't exist");
 
-            var req = requestOpt.get();
+        var req = requestOpt.get();
 
-            req.setApprovedStatus(RequestStatuses.DISAPPROVED);
-            _requestRepository.save(req);
+        req.setApprovedStatus(RequestStatuses.DISAPPROVED);
+        _requestRepository.save(req);
 
-            return ResponseEntity.ok().body("successfully disapproved");
-        } catch(Exception ex){
-            log.error(ex.getMessage());
-            return ResponseEntity.status(500).build();
-        }
+        return ResponseEntity.ok().body("successfully disapproved");
     }
 
     @GetMapping("/get-requests-order-by-date-today")
@@ -321,17 +311,12 @@ public class RequestController {
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
     public ResponseEntity<?> getRequestsOrderByDateToday(HttpServletRequest request){
-        try {
 
-            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-            if(requests.isEmpty())
-                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if(requests.isEmpty())
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            return ResponseEntity.ok().body(_timeService.filterByToday(requests));
-        } catch (Exception ex){
-            log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
-        }
+        return ResponseEntity.ok().body(_timeService.filterByToday(requests));
     }
 
     @GetMapping("/get-requests-order-by-date-week")
@@ -345,17 +330,12 @@ public class RequestController {
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
     public ResponseEntity<?> getRequestsOrderByDateWeek(HttpServletRequest request){
-        try{
 
-            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-            if(requests.isEmpty())
-                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if(requests.isEmpty())
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            return ResponseEntity.ok().body(_timeService.filterByCurrentWeek(requests)); //фильтрация по текущей неделе
-        } catch(Exception ex) {
-            log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
-        }
+        return ResponseEntity.ok().body(_timeService.filterByCurrentWeek(requests)); //фильтрация по текущей неделе
     }
 
     @GetMapping("/get-requests-order-by-month")
@@ -369,16 +349,11 @@ public class RequestController {
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
     public ResponseEntity<?> getRequestsOrderByMonth(HttpServletRequest request){
-        try {
-            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-            if(requests.isEmpty())
-                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if(requests.isEmpty())
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            return ResponseEntity.ok().body(_timeService.filterByCurrentMonth(requests));
-        } catch (Exception ex){
-            log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
-        }
+        return ResponseEntity.ok().body(_timeService.filterByCurrentMonth(requests));
     }
 
     @PostMapping("/get-requests-order-by-dates")
@@ -400,19 +375,14 @@ public class RequestController {
             )
             @RequestBody SortByDateDTO dto,
             HttpServletRequest request){
-        try {
-            if(!dto.isValid())
-                return ResponseEntity.badRequest().body("dto is invalid");
+        if(!dto.isValid())
+            return ResponseEntity.badRequest().body("dto is invalid");
 
-            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-            if(requests.isEmpty())
-                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if(requests.isEmpty())
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            return ResponseEntity.ok().body(_timeService.filterByDateTimeRange(requests, dto.date1, dto.date2));
-        } catch (Exception ex){
-            log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
-        }
+        return ResponseEntity.ok().body(_timeService.filterByDateTimeRange(requests, dto.date1, dto.date2));
     }
 
     @GetMapping("/get-requests-order-by-date-quarter/{numberOfQuarter}")
@@ -429,17 +399,12 @@ public class RequestController {
             @Parameter(description = "Номер квартала (1-4)", required = true)
             @PathVariable int numberOfQuarter,
             HttpServletRequest request){
-        try{
 
-            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-            if(requests.isEmpty())
-                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if(requests.isEmpty())
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            return ResponseEntity.ok().body(_timeService.filterByQuarter(requests, numberOfQuarter));
-        } catch(Exception ex) {
-            log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
-        }
+        return ResponseEntity.ok().body(_timeService.filterByQuarter(requests, numberOfQuarter));
     }
 
     @GetMapping("/get-operations-by-project/{projectName}")
@@ -456,20 +421,15 @@ public class RequestController {
             @Parameter(description = "Название проекта", required = true)
             @PathVariable Long projectId,
             HttpServletRequest request){
-        try {
-            var requests = _requestRepository.findByProjectIdAndCompanyId(projectId, Long.parseLong(request.getHeader("X-Company-Id")));
-            if(requests.isEmpty())
-                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        var requests = _requestRepository.findByProjectIdAndCompanyId(projectId, Long.parseLong(request.getHeader("X-Company-Id")));
+        if(requests.isEmpty())
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            var operations = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED).toList();
-            if(operations.isEmpty())
-                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        var operations = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED).toList();
+        if(operations.isEmpty())
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            return ResponseEntity.ok().body(operations);
-        } catch (Exception ex){
-            log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
-        }
+        return ResponseEntity.ok().body(operations);
     }
 
     @GetMapping("/get-requests-order-by-date-year")
@@ -483,17 +443,12 @@ public class RequestController {
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
     public ResponseEntity<?> getRequestsOrderByYear(HttpServletRequest request){
-        try{
 
-            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-            if(requests.isEmpty())
-                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if(requests.isEmpty())
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            return ResponseEntity.ok().body(_timeService.filterByCurrentYear(requests));
-        } catch(Exception ex) {
-            log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
-        }
+        return ResponseEntity.ok().body(_timeService.filterByCurrentYear(requests));
     }
 
     @GetMapping("/get-company-requests")
@@ -507,17 +462,11 @@ public class RequestController {
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
     public ResponseEntity<?> getCompanyRequests(HttpServletRequest request){
-        try {
+        var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if(requests.isEmpty())
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-            if(requests.isEmpty())
-                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-
-            return ResponseEntity.ok().body(requests);
-        } catch (Exception ex){
-            log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
-        }
+        return ResponseEntity.ok().body(requests);
     }
 
     @GetMapping("/get-company-operations")
@@ -531,17 +480,11 @@ public class RequestController {
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
     public ResponseEntity<?> getCompanyOperations(HttpServletRequest request){
-        try{
+        var operations = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if(operations.isEmpty())
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
-            var operations = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-            if(operations.isEmpty())
-                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-
-            return ResponseEntity.ok().body(operations.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED));
-        } catch(Exception ex){
-            log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
-        }
+        return ResponseEntity.ok().body(operations.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED));
     }
 
     @GetMapping("/get-project-statistic/{projectName}")
@@ -559,19 +502,14 @@ public class RequestController {
             @Parameter(description = "Название проекта", required = true)
             @PathVariable Long projectId,
             HttpServletRequest request){
-        try {
 
-            var projectOperations = _requestRepository.findByProjectIdAndCompanyId(projectId, Long.parseLong(request.getHeader("X-Company-Id")));
-            StatDTO stat = new StatDTO();
-            stat.setRevenue(projectOperations.stream().filter(x -> x.getSum() > 0).mapToDouble(x -> x.getSum()).sum());
-            stat.setProfit(projectOperations.stream().mapToDouble(x -> x.getSum()).sum());
-            stat.setCountOfOperations(projectOperations.stream().count());
+        var projectOperations = _requestRepository.findByProjectIdAndCompanyId(projectId, Long.parseLong(request.getHeader("X-Company-Id")));
+        StatDTO stat = new StatDTO();
+        stat.setRevenue(projectOperations.stream().filter(x -> x.getSum() > 0).mapToDouble(x -> x.getSum()).sum());
+        stat.setProfit(projectOperations.stream().mapToDouble(x -> x.getSum()).sum());
+        stat.setCountOfOperations(projectOperations.stream().count());
 
-            return ResponseEntity.ok().body(stat);
-        } catch (Exception ex){
-            log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
-        }
+        return ResponseEntity.ok().body(stat);
     }
 
 }
