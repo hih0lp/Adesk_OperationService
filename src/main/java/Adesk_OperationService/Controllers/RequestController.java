@@ -186,8 +186,8 @@ public class RequestController {
             else if(Arrays.stream(request.getHeader("X-User-Permissions")
                     .split(",")).anyMatch(s -> s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE"))){
 
-                if (requests.stream().anyMatch(s -> s.getApprovedStatus() == RequestStatuses.APPROVED || s.getApprovedStatus() == RequestStatuses.DISAPPROVED))
-                    return ResponseEntity.badRequest().body("you can only delete projects which is not approved");
+                if (requests.stream().anyMatch(s -> s.getApprovedStatus() == RequestStatuses.APPROVING))
+                    return ResponseEntity.badRequest().body("you can only delete projects which approved");
 
                 if(!Arrays.stream(request.getHeader("X-User-Permissions").split(",")).anyMatch(s -> s.equals("REQUEST_WORK")))
                     if(requests.stream().anyMatch(s -> s.getResponsibleManager() != request.getHeader("X-User-Email")))
