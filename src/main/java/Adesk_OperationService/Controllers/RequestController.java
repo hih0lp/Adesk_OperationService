@@ -167,13 +167,25 @@ public class RequestController {
             var requests = _requestRepository.findAllById(dtos.stream().map(x -> x.getId()).collect(Collectors.toList()));
 
 
-            if(Arrays.stream(request.getHeader("X-User-Permissions") //если может удалять только проекты до аппрува
-                    .split(",")).anyMatch(s -> s.equals("CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE") || s.equals("REQUEST_WORK"))){ //для работы с запросами
+            if(!Arrays.stream(request.getHeader("X-User-Permissions") //если может удалять только проекты до аппрува
+                    .split(",")).anyMatch(s -> s.equals("REQUEST_WORK"))){
+
+                List<Long> ids = dtos.stream()
+                        .map(dto -> dto.getId())
+                        .collect(Collectors.toList());
+
+                _requestRepository.deleteAllById(ids);
+
+                return ResponseEntity.ok().body("deleting successfully");
+            }
+            else if(Arrays.stream(request.getHeader("X-User-Permissions") //если может удалять только проекты до аппрува
+                    .split(",")).anyMatch(s -> s.equals("CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE"))){ //для работы с запросами
                 if(requests.stream().anyMatch(x -> x.getApprovedStatus() != RequestStatuses.APPROVING))
                     return ResponseEntity.badRequest().body("you can delete only request with approving status");
                 if(!Arrays.stream(request.getHeader("X-User-Permissions").split(",")).anyMatch(s -> s.equals("REQUEST_WORK")))
                     if (requests.stream().anyMatch(s -> !s.getCreatorEmail().equals(request.getHeader("X-User-Email"))))
                         return ResponseEntity.badRequest().body("you can delete only yours request");
+
 
                 List<Long> ids = dtos.stream()
                         .map(dto -> dto.getId())
