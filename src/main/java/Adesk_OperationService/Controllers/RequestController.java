@@ -167,7 +167,7 @@ public class RequestController {
             var requests = _requestRepository.findAllById(dtos.stream().map(x -> x.getId()).collect(Collectors.toList()));
 
 
-            if(!Arrays.stream(request.getHeader("X-User-Permissions") //если может удалять только проекты до аппрува
+            if(Arrays.stream(request.getHeader("X-User-Permissions") //если может удалять только проекты до аппрува
                     .split(",")).anyMatch(s -> s.equals("REQUEST_WORK"))){
 
                 List<Long> ids = dtos.stream()
