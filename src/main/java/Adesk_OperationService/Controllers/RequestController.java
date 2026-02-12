@@ -465,6 +465,7 @@ public class RequestController {
         var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
         if(requests.isEmpty())
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        
         requests = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING).toList();
 
         return ResponseEntity.ok().body(_timeService.filterByCurrentYear(requests));
