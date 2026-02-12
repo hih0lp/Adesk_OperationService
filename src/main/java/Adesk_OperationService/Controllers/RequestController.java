@@ -220,7 +220,7 @@ public class RequestController {
 
     @GetMapping("/get-requests")
     @Operation(
-            summary = "Получение запросов по проекту",
+            summary = "Получение запросов на компанию",
             description = "Возвращает список запросов для текущей компании"
     )
     @ApiResponses(value = {
@@ -463,23 +463,23 @@ public class RequestController {
         return ResponseEntity.ok().body(_timeService.filterByCurrentYear(requests));
     }
 
-    @GetMapping("/get-company-requests")
-    @Operation(
-            summary = "Получение всех запросов компании",
-            description = "Возвращает все запросы текущей компании"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
-            @ApiResponse(responseCode = "204", description = "Нет данных"),
-            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
-    })
-    public ResponseEntity<?> getCompanyRequests(HttpServletRequest request){
-        var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-        if(requests.isEmpty())
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-
-        return ResponseEntity.ok().body(requests);
-    }
+//    @GetMapping("/get-company-requests")
+//    @Operation(
+//            summary = "Получение всех запросов компании",
+//            description = "Возвращает все запросы текущей компании"
+//    )
+//    @ApiResponses(value = {
+//            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+//            @ApiResponse(responseCode = "204", description = "Нет данных"),
+//            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+//    })
+//    public ResponseEntity<?> getCompanyRequests(HttpServletRequest request){
+//        var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+//        if(requests.isEmpty())
+//            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+//
+//        return ResponseEntity.ok().body(requests);
+//    }
 
     @GetMapping("/get-company-operations")
     @Operation(
