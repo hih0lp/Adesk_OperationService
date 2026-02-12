@@ -2,6 +2,7 @@
 
     import Adesk_OperationService.Constants.RequestStatuses;
     import Adesk_OperationService.Model.FileModel;
+    import Adesk_OperationService.Model.OperationModel.Request.RequestModelDeleteDTO;
     import Adesk_OperationService.Model.OperationModel.RequestContext;
     import Adesk_OperationService.Model.OperationModel.Request.RequestFormDTO;
     import Adesk_OperationService.Model.OperationModel.RequestModel;
@@ -9,6 +10,7 @@
     import lombok.RequiredArgsConstructor;
     import org.slf4j.Logger;
     import org.slf4j.LoggerFactory;
+    import org.springframework.http.ResponseEntity;
     import org.springframework.scheduling.annotation.Async;
     import org.springframework.stereotype.Service;
     import org.springframework.web.multipart.MultipartFile;
@@ -16,8 +18,10 @@
     import java.io.IOException;
     import java.time.ZonedDateTime;
     import java.util.ArrayList;
+    import java.util.Arrays;
     import java.util.List;
     import java.util.concurrent.CompletableFuture;
+    import java.util.stream.Collectors;
 
     @Service
     @RequiredArgsConstructor
@@ -26,8 +30,11 @@
         private final RequestRepository requestRepository;
 
 
-        @Async
+
         public CompletableFuture<Long> createRequestAsync(RequestFormDTO form, RequestContext requestContext){
+            return CompletableFuture.supplyAsync(() -> {
+
+
                 if(!form.isValid()) throw new IllegalArgumentException("Form is invalid");
 
                 var newRequest = new RequestModel();
@@ -60,7 +67,18 @@
                 }
 
                 requestRepository.save(newRequest);
-                return CompletableFuture.completedFuture(newRequest.getId());
+                return newRequest.getId();
+            });
+        }
+
+        public CompletableFuture<Void> deleteRequests(List<RequestModelDeleteDTO> dtos){
+            if (dtos.stream().anyMatch(x -> x.getId() == null)) throw new RuntimeException("dto is invalid");
+
+            return CompletableFuture.runAsync(() -> {
+                requestRepository.deleteAllById(
+                        dtos.stream().map(RequestModelDeleteDTO::getId).collect(Collectors.toList())
+                );
+            });
         }
 
         private FileModel createFileModel(MultipartFile multipartFile,
