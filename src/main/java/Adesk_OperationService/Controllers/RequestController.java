@@ -12,28 +12,22 @@ import Adesk_OperationService.Services.RequestService;
 import Adesk_OperationService.Services.TimeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.apache.coyote.Response;
-import org.apache.tomcat.util.http.fileupload.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
-import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.web.bind.annotation.*;
 
-import javax.tools.JavaFileManager;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -42,7 +36,6 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/requests")
 @RequiredArgsConstructor
-//@RestControllerAdvice
 @Tag(name = "Управление запросами", description = "API для работы с запросами на операции")
 @SecurityRequirement(name = "bearerAuth")
 public class RequestController {
@@ -51,8 +44,6 @@ public class RequestController {
     private final TimeService _timeService;
     private final RequestService requestService;
     private final FileRepository fileRepository;
-//    private final
-
 
     @PostMapping(value = "/create-request", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Transactional
@@ -60,6 +51,12 @@ public class RequestController {
             summary = "Создание нового запроса с файлами",
             description = "Создает новый запрос на операцию с прикрепленными файлами. Требуется право CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE"
     )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Запрос успешно создан"),
+            @ApiResponse(responseCode = "401", description = "Недостаточно прав"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    
     public CompletableFuture<ResponseEntity<?>> createRequestAsync(
             @ModelAttribute RequestFormDTO form,
             HttpServletRequest request) {
@@ -73,16 +70,24 @@ public class RequestController {
                 request.getHeader("X-User-Email")
         );
 
-//        log.info("OKEYOKEYOKEYOKEY");
-
         return requestService.createRequestAsync(form, rContext)
                 .thenApply(ResponseEntity::ok);
     }
 
-
-
     @GetMapping("/download-file/{id}")
+    @Operation(
+            summary = "Скачивание файла",
+            description = "Скачивает файл по его ID. Требуется право REQUEST_WORK"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Файл успешно скачан"),
+            @ApiResponse(responseCode = "401", description = "Недостаточно прав"),
+            @ApiResponse(responseCode = "404", description = "Файл не найден"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    
     public CompletableFuture<ResponseEntity<byte[]>> downloadFile(
+            @Parameter(description = "ID файла", required = true)
             @PathVariable Long id,
             HttpServletRequest request
     ) {
@@ -115,6 +120,10 @@ public class RequestController {
                 mediaType = MediaType.APPLICATION_PDF;
             } else if (storedName.endsWith(".webp")) {
                 mediaType = MediaType.parseMediaType("image/webp");
+            } else if (storedName.endsWith(".jpg") || storedName.endsWith(".jpeg")) {
+                mediaType = MediaType.IMAGE_JPEG;
+            } else if (storedName.endsWith(".png")) {
+                mediaType = MediaType.IMAGE_PNG;
             }
         }
 
@@ -136,13 +145,6 @@ public class RequestController {
         );
     }
 
-
-
-
-
-
-
-
     @DeleteMapping("/delete-requests")
     @Transactional
     @Operation(
@@ -155,20 +157,20 @@ public class RequestController {
             @ApiResponse(responseCode = "401", description = "Недостаточно прав"),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public ResponseEntity<?> deleteRequestsAsync(
+    
+    public CompletableFuture<ResponseEntity<?>> deleteRequestsAsync(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Список ID запросов для удаления",
                     required = true,
-                    content = @Content(schema = @Schema(implementation = RequestModelDeleteDTO.class))
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModelDeleteDTO.class)))
             )
             @RequestBody List<RequestModelDeleteDTO> dtos,
-            HttpServletRequest request){
-        try{
+            HttpServletRequest request) {
+        try {
             var requests = _requestRepository.findAllById(dtos.stream().map(x -> x.getId()).collect(Collectors.toList()));
 
-
-            if(Arrays.stream(request.getHeader("X-User-Permissions") //если может удалять только проекты до аппрува
-                    .split(",")).anyMatch(s -> s.equals("REQUEST_WORK"))){
+            if (Arrays.stream(request.getHeader("X-User-Permissions").split(","))
+                    .anyMatch(s -> s.equals("REQUEST_WORK"))) {
 
                 List<Long> ids = dtos.stream()
                         .map(dto -> dto.getId())
@@ -176,16 +178,19 @@ public class RequestController {
 
                 _requestRepository.deleteAllById(ids);
 
-                return ResponseEntity.ok().body("deleting successfully");
-            }
-            else if(Arrays.stream(request.getHeader("X-User-Permissions") //если может удалять только проекты до аппрува
-                    .split(",")).anyMatch(s -> s.equals("CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE"))){ //для работы с запросами
-                if(requests.stream().anyMatch(x -> x.getApprovedStatus() != RequestStatuses.APPROVING))
-                    return ResponseEntity.badRequest().body("you can delete only request with approving status");
-                if(!Arrays.stream(request.getHeader("X-User-Permissions").split(",")).anyMatch(s -> s.equals("REQUEST_WORK")))
+                return CompletableFuture.completedFuture(ResponseEntity.ok().body("deleting successfully"));
+            } else if (Arrays.stream(request.getHeader("X-User-Permissions").split(","))
+                    .anyMatch(s -> s.equals("CREATE_REQUEST_AND_DELETE_BEFORE_APPROVE"))) {
+
+                if (requests.stream().anyMatch(x -> x.getApprovedStatus() != RequestStatuses.APPROVING))
+                    return CompletableFuture.completedFuture(
+                            ResponseEntity.badRequest().body("you can delete only request with approving status"));
+
+                if (!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
+                        .anyMatch(s -> s.equals("REQUEST_WORK")))
                     if (requests.stream().anyMatch(s -> !s.getCreatorEmail().equals(request.getHeader("X-User-Email"))))
-                        return ResponseEntity.badRequest().body("you can delete only yours request");
-
+                        return CompletableFuture.completedFuture(
+                                ResponseEntity.badRequest().body("you can delete only yours request"));
 
                 List<Long> ids = dtos.stream()
                         .map(dto -> dto.getId())
@@ -193,58 +198,67 @@ public class RequestController {
 
                 _requestRepository.deleteAllById(ids);
 
-                return ResponseEntity.ok().body("deleting successfully");
-            }
-            else if(Arrays.stream(request.getHeader("X-User-Permissions")
-                    .split(",")).anyMatch(s -> s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE"))){
+                return CompletableFuture.completedFuture(ResponseEntity.ok().body("deleting successfully"));
+            } else if (Arrays.stream(request.getHeader("X-User-Permissions").split(","))
+                    .anyMatch(s -> s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE"))) {
 
                 if (requests.stream().anyMatch(s -> s.getApprovedStatus() == RequestStatuses.APPROVING))
-                    return ResponseEntity.badRequest().body("you can only delete projects which approved");
+                    return CompletableFuture.completedFuture(
+                            ResponseEntity.badRequest().body("you can only delete projects which approved"));
 
-                if(!Arrays.stream(request.getHeader("X-User-Permissions").split(",")).anyMatch(s -> s.equals("REQUEST_WORK")))
-                    if(requests.stream().anyMatch(s -> s.getResponsibleManager() != request.getHeader("X-User-Email")))
-                        return ResponseEntity.badRequest().body("you can only delete your projects");
+                if (!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
+                        .anyMatch(s -> s.equals("REQUEST_WORK")))
+                    if (requests.stream().anyMatch(s -> s.getResponsibleManager() != request.getHeader("X-User-Email")))
+                        return CompletableFuture.completedFuture(
+                                ResponseEntity.badRequest().body("you can only delete your projects"));
 
                 List<Long> ids = dtos.stream().map(dto -> dto.getId()).collect(Collectors.toList());
 
                 _requestRepository.deleteAllById(ids);
 
-                return ResponseEntity.ok().body("deleting successfully");
+                return CompletableFuture.completedFuture(ResponseEntity.ok().body("deleting successfully"));
+            } else {
+                return CompletableFuture.completedFuture(
+                        ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights"));
             }
-            else return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("no rights");
-        } catch(Exception ex){
+        } catch (Exception ex) {
             log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
+            return CompletableFuture.completedFuture(
+                    ResponseEntity.status(500).body("Logic error"));
         }
     }
 
     @GetMapping("/get-requests")
     @Operation(
-            summary = "Получение запросов на компанию",
-            description = "Возвращает список запросов для текущей компании"
+            summary = "Получение запросов компании",
+            description = "Возвращает список запросов для текущей компании (статус APPROVING)"
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
             @ApiResponse(responseCode = "204", description = "Нет данных"),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public ResponseEntity<?> getRequestsByProjectName(HttpServletRequest request){
-        try{
-
+    
+    public CompletableFuture<ResponseEntity<?>> getRequestsByProjectName(HttpServletRequest request) {
+        try {
             var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-            if(requests.isEmpty())
-                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+            if (requests.isEmpty())
+                return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
 
-            requests = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING).toList();
+            requests = requests.stream()
+                    .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING)
+                    .collect(Collectors.toList());
 
-            return ResponseEntity.ok().body(requests);
-        } catch(Exception ex){
+            return CompletableFuture.completedFuture(ResponseEntity.ok().body(requests));
+        } catch (Exception ex) {
             log.error(ex.getMessage());
-            return ResponseEntity.status(500).body("Logic error");
+            return CompletableFuture.completedFuture(ResponseEntity.status(500).body("Logic error"));
         }
     }
 
     @PostMapping("/approve-request/{requestId}")
+    @Transactional
     @Operation(
             summary = "Утверждение запроса",
             description = "Утверждает запрос с указанным ID. Требуются права REQUEST_WORK или APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE"
@@ -255,32 +269,35 @@ public class RequestController {
             @ApiResponse(responseCode = "401", description = "Недостаточно прав"),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public ResponseEntity<?> approveRequest(
+    
+    public CompletableFuture<ResponseEntity<?>> approveRequest(
             @Parameter(description = "ID запроса для утверждения", required = true)
             @PathVariable Long requestId,
-            HttpServletRequest request){
-        if(requestId == null)
-            return ResponseEntity.badRequest().body("id cannot be null");
+            HttpServletRequest request) {
 
-        if(!Arrays.stream(request.getHeader("X-User-Permissions")
-                .split(",")).anyMatch(s -> s.equals("REQUEST_WORK") || s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE")))
-            return ResponseEntity.badRequest().body("no rights");
+        if (requestId == null)
+            return CompletableFuture.completedFuture(ResponseEntity.badRequest().body("id cannot be null"));
+
+        if (!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
+                .anyMatch(s -> s.equals("REQUEST_WORK") || s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE")))
+            return CompletableFuture.completedFuture(ResponseEntity.badRequest().body("no rights"));
 
         var requestOpt = _requestRepository.findById(requestId);
-        if(requestOpt.isEmpty())
-            return ResponseEntity.badRequest().body("request doesn't exist");
-
+        if (requestOpt.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.badRequest().body("request doesn't exist"));
 
         var req = requestOpt.get();
-        if(req.getApprovedStatus() == RequestStatuses.APPROVING)
-            return ResponseEntity.badRequest().body("request has been already approved");
+        if (req.getApprovedStatus() == RequestStatuses.APPROVED)
+            return CompletableFuture.completedFuture(ResponseEntity.badRequest().body("request has been already approved"));
+
         req.setApprovedStatus(RequestStatuses.APPROVED);
         _requestRepository.save(req);
 
-        return ResponseEntity.ok().body("successfully approving");
+        return CompletableFuture.completedFuture(ResponseEntity.ok().body("successfully approved"));
     }
 
     @PostMapping("/disapprove-request/{requestId}")
+    @Transactional
     @Operation(
             summary = "Отклонение запроса",
             description = "Отклоняет запрос с указанным ID. Требуются права REQUEST_WORK или APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE"
@@ -291,27 +308,27 @@ public class RequestController {
             @ApiResponse(responseCode = "401", description = "Недостаточно прав"),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public ResponseEntity<?> disapproveRequest(
+    
+    public CompletableFuture<ResponseEntity<?>> disapproveRequest(
             @Parameter(description = "ID запроса для отклонения", required = true)
             @PathVariable Long requestId,
-            HttpServletRequest request){
-        if(requestId == null)
-            return ResponseEntity.badRequest().body("id cannot be null");
+            HttpServletRequest request) {
 
-        if(!Arrays.stream(request.getHeader("X-User-Permissions")
-                .split(",")).anyMatch(s -> s.equals("REQUEST_WORK") || s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE")))
-            return ResponseEntity.badRequest().body("no rights");
+        if (requestId == null)
+            return CompletableFuture.completedFuture(ResponseEntity.badRequest().body("id cannot be null"));
+
+        if (!Arrays.stream(request.getHeader("X-User-Permissions").split(","))
+                .anyMatch(s -> s.equals("REQUEST_WORK") || s.equals("APPROVE_REQUEST_AND_DELETE_AFTER_APPROVE")))
+            return CompletableFuture.completedFuture(ResponseEntity.badRequest().body("no rights"));
 
         var requestOpt = _requestRepository.findById(requestId);
-        if(requestOpt.isEmpty())
-            return ResponseEntity.badRequest().body("request doesn't exist");
+        if (requestOpt.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.badRequest().body("request doesn't exist"));
 
         var req = requestOpt.get();
-
-//        req.setApprovedStatus(RequestStatuses.DISAPPROVED);
         _requestRepository.delete(req);
 
-        return ResponseEntity.ok().body("successfully disapproved");
+        return CompletableFuture.completedFuture(ResponseEntity.ok().body("successfully disapproved"));
     }
 
     @GetMapping("/get-requests-order-by-date-today")
@@ -320,17 +337,19 @@ public class RequestController {
             description = "Возвращает запросы текущей компании за сегодняшний день"
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
             @ApiResponse(responseCode = "204", description = "Нет данных"),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public ResponseEntity<?> getRequestsOrderByDateToday(HttpServletRequest request){
-
+    
+    public CompletableFuture<ResponseEntity<?>> getRequestsOrderByDateToday(HttpServletRequest request) {
         var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-        if(requests.isEmpty())
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        if (requests.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
 
-        return ResponseEntity.ok().body(_timeService.filterByToday(requests));
+        return CompletableFuture.completedFuture(
+                ResponseEntity.ok().body(_timeService.filterByToday(requests)));
     }
 
     @GetMapping("/get-requests-order-by-date-week")
@@ -339,18 +358,23 @@ public class RequestController {
             description = "Возвращает запросы текущей компании за текущую неделю"
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
             @ApiResponse(responseCode = "204", description = "Нет данных"),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public ResponseEntity<?> getRequestsOrderByDateWeek(HttpServletRequest request){
-
+    
+    public CompletableFuture<ResponseEntity<?>> getRequestsOrderByDateWeek(HttpServletRequest request) {
         var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-        if(requests.isEmpty())
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-        requests = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING).toList();
+        if (requests.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
 
-        return ResponseEntity.ok().body(_timeService.filterByCurrentWeek(requests)); //фильтрация по текущей неделе
+        requests = requests.stream()
+                .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING)
+                .collect(Collectors.toList());
+
+        return CompletableFuture.completedFuture(
+                ResponseEntity.ok().body(_timeService.filterByCurrentWeek(requests)));
     }
 
     @GetMapping("/get-requests-order-by-month")
@@ -359,17 +383,23 @@ public class RequestController {
             description = "Возвращает запросы текущей компании за текущий месяц"
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
             @ApiResponse(responseCode = "204", description = "Нет данных"),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public ResponseEntity<?> getRequestsOrderByMonth(HttpServletRequest request){
+    
+    public CompletableFuture<ResponseEntity<?>> getRequestsOrderByMonth(HttpServletRequest request) {
         var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-        if(requests.isEmpty())
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-        requests = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING).toList();
+        if (requests.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
 
-        return ResponseEntity.ok().body(_timeService.filterByCurrentMonth(requests));
+        requests = requests.stream()
+                .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING)
+                .collect(Collectors.toList());
+
+        return CompletableFuture.completedFuture(
+                ResponseEntity.ok().body(_timeService.filterByCurrentMonth(requests)));
     }
 
     @PostMapping("/get-requests-order-by-dates")
@@ -378,28 +408,35 @@ public class RequestController {
             description = "Возвращает запросы текущей компании в указанном диапазоне дат"
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
             @ApiResponse(responseCode = "400", description = "Невалидные даты"),
             @ApiResponse(responseCode = "204", description = "Нет данных"),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public ResponseEntity<?> getRequestsOrderByDates(
+    
+    public CompletableFuture<ResponseEntity<?>> getRequestsOrderByDates(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Диапазон дат для фильтрации",
                     required = true,
                     content = @Content(schema = @Schema(implementation = SortByDateDTO.class))
             )
             @RequestBody SortByDateDTO dto,
-            HttpServletRequest request){
-        if(!dto.isValid())
-            return ResponseEntity.badRequest().body("dto is invalid");
+            HttpServletRequest request) {
+
+        if (!dto.isValid())
+            return CompletableFuture.completedFuture(ResponseEntity.badRequest().body("dto is invalid"));
 
         var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-        if(requests.isEmpty())
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-        requests = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING).toList();
+        if (requests.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
 
-        return ResponseEntity.ok().body(_timeService.filterByDateTimeRange(requests, dto.date1, dto.date2));
+        requests = requests.stream()
+                .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING)
+                .collect(Collectors.toList());
+
+        return CompletableFuture.completedFuture(
+                ResponseEntity.ok().body(_timeService.filterByDateTimeRange(requests, dto.date1, dto.date2)));
     }
 
     @GetMapping("/get-requests-order-by-date-quarter/{numberOfQuarter}")
@@ -408,46 +445,68 @@ public class RequestController {
             description = "Возвращает запросы текущей компании за указанный квартал"
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
             @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "400", description = "Неверный номер квартала"),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public ResponseEntity<?> getRequestsOrderByDateQuarter(
-            @Parameter(description = "Номер квартала (1-4)", required = true)
+    
+    public CompletableFuture<ResponseEntity<?>> getRequestsOrderByDateQuarter(
+            @Parameter(description = "Номер квартала (1-4)", required = true, example = "1")
             @PathVariable int numberOfQuarter,
-            HttpServletRequest request){
+            HttpServletRequest request) {
+
+        if (numberOfQuarter < 1 || numberOfQuarter > 4) {
+            return CompletableFuture.completedFuture(
+                    ResponseEntity.badRequest().body("Quarter must be between 1 and 4"));
+        }
 
         var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-        if(requests.isEmpty())
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-        requests = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING).toList();
+        if (requests.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
 
-        return ResponseEntity.ok().body(_timeService.filterByQuarter(requests, numberOfQuarter));
+        requests = requests.stream()
+                .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING)
+                .collect(Collectors.toList());
+
+        return CompletableFuture.completedFuture(
+                ResponseEntity.ok().body(_timeService.filterByQuarter(requests, numberOfQuarter)));
     }
 
-    @GetMapping("/get-operations-by-project/{projectName}")
+    @GetMapping("/get-operations-by-project/{projectId}")
     @Operation(
             summary = "Получение операций по проекту",
             description = "Возвращает утвержденные операции (запросы) для указанного проекта"
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Операции успешно получены"),
+            @ApiResponse(responseCode = "200", description = "Операции успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
             @ApiResponse(responseCode = "204", description = "Нет данных"),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public ResponseEntity<?> getProjectOperations(
-            @Parameter(description = "Название проекта", required = true)
+    
+    public CompletableFuture<ResponseEntity<?>> getProjectOperations(
+            @Parameter(description = "ID проекта", required = true)
             @PathVariable Long projectId,
-            HttpServletRequest request){
-        var requests = _requestRepository.findByProjectIdAndCompanyId(projectId, Long.parseLong(request.getHeader("X-Company-Id")));
-        if(requests.isEmpty())
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+            HttpServletRequest request) {
 
-        var operations = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED).toList();
-        if(operations.isEmpty())
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        var requests = _requestRepository.findByProjectIdAndCompanyId(
+                projectId,
+                Long.parseLong(request.getHeader("X-Company-Id"))
+        );
 
-        return ResponseEntity.ok().body(operations);
+        if (requests.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+
+        var operations = requests.stream()
+                .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED)
+                .collect(Collectors.toList());
+
+        if (operations.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+
+        return CompletableFuture.completedFuture(ResponseEntity.ok().body(operations));
     }
 
     @GetMapping("/get-requests-order-by-date-year")
@@ -456,38 +515,24 @@ public class RequestController {
             description = "Возвращает запросы текущей компании за текущий год"
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
+            @ApiResponse(responseCode = "200", description = "Запросы успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
             @ApiResponse(responseCode = "204", description = "Нет данных"),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public ResponseEntity<?> getRequestsOrderByYear(HttpServletRequest request){
-
+    
+    public CompletableFuture<ResponseEntity<?>> getRequestsOrderByYear(HttpServletRequest request) {
         var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-        if(requests.isEmpty())
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-        
-        requests = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING).toList();
+        if (requests.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
 
-        return ResponseEntity.ok().body(_timeService.filterByCurrentYear(requests));
+        requests = requests.stream()
+                .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING)
+                .collect(Collectors.toList());
+
+        return CompletableFuture.completedFuture(
+                ResponseEntity.ok().body(_timeService.filterByCurrentYear(requests)));
     }
-
-//    @GetMapping("/get-company-requests")
-//    @Operation(
-//            summary = "Получение всех запросов компании",
-//            description = "Возвращает все запросы текущей компании"
-//    )
-//    @ApiResponses(value = {
-//            @ApiResponse(responseCode = "200", description = "Запросы успешно получены"),
-//            @ApiResponse(responseCode = "204", description = "Нет данных"),
-//            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
-//    })
-//    public ResponseEntity<?> getCompanyRequests(HttpServletRequest request){
-//        var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-//        if(requests.isEmpty())
-//            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-//
-//        return ResponseEntity.ok().body(requests);
-//    }
 
     @GetMapping("/get-company-operations")
     @Operation(
@@ -495,19 +540,200 @@ public class RequestController {
             description = "Возвращает все утвержденные операции (запросы) текущей компании"
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Операции успешно получены"),
+            @ApiResponse(responseCode = "200", description = "Операции успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
             @ApiResponse(responseCode = "204", description = "Нет данных"),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public ResponseEntity<?> getCompanyOperations(HttpServletRequest request){
+    
+    public CompletableFuture<ResponseEntity<?>> getCompanyOperations(HttpServletRequest request) {
         var operations = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
-        if(operations.isEmpty())
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        if (operations.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
 
-        return ResponseEntity.ok().body(operations.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED));
+        var approvedOperations = operations.stream()
+                .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED)
+                .collect(Collectors.toList());
+
+        return CompletableFuture.completedFuture(ResponseEntity.ok().body(approvedOperations));
     }
 
-    @GetMapping("/get-project-statistic/{projectName}")
+    @GetMapping("/get-company-operations-order-by-date-today")
+    @Operation(
+            summary = "Получение операций компании за сегодня",
+            description = "Возвращает утвержденные операции текущей компании за сегодняшний день"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Операции успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    
+    public CompletableFuture<ResponseEntity<?>> getCompanyOperationsOrderByDateToday(HttpServletRequest request) {
+        var operations = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if (operations.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+
+        var approvedOperations = operations.stream()
+                .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED)
+                .collect(Collectors.toList());
+
+        return CompletableFuture.completedFuture(
+                ResponseEntity.ok().body(_timeService.filterByToday(approvedOperations)));
+    }
+
+    @GetMapping("/get-company-operations-order-by-week")
+    @Operation(
+            summary = "Получение операций компании за неделю",
+            description = "Возвращает утвержденные операции текущей компании за текущую неделю"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Операции успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    
+    public CompletableFuture<ResponseEntity<?>> getCompanyOperationsOrderByDateWeek(HttpServletRequest request) {
+        var operations = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if (operations.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+
+        var approvedOperations = operations.stream()
+                .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED)
+                .collect(Collectors.toList());
+
+        return CompletableFuture.completedFuture(
+                ResponseEntity.ok().body(_timeService.filterByCurrentWeek(approvedOperations)));
+    }
+
+    @GetMapping("/get-company-operations-order-by-month")
+    @Operation(
+            summary = "Получение операций компании за месяц",
+            description = "Возвращает утвержденные операции текущей компании за текущий месяц"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Операции успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    
+    public CompletableFuture<ResponseEntity<?>> getCompanyOperationsOrderByMonth(HttpServletRequest request) {
+        var operations = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if (operations.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+
+        var approvedOperations = operations.stream()
+                .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED)
+                .collect(Collectors.toList());
+
+        return CompletableFuture.completedFuture(
+                ResponseEntity.ok().body(_timeService.filterByCurrentMonth(approvedOperations)));
+    }
+
+    @GetMapping("/get-company-operations-order-by-dates-quarter/{numberOfQuarter}")
+    @Operation(
+            summary = "Получение операций компании за квартал",
+            description = "Возвращает утвержденные операции текущей компании за указанный квартал"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Операции успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "400", description = "Неверный номер квартала"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    
+    public CompletableFuture<ResponseEntity<?>> getCompanyOperationsOrderByDatesQuarter(
+            @Parameter(description = "Номер квартала (1-4)", required = true, example = "1")
+            @PathVariable int numberOfQuarter,
+            HttpServletRequest request) {
+
+        if (numberOfQuarter < 1 || numberOfQuarter > 4) {
+            return CompletableFuture.completedFuture(
+                    ResponseEntity.badRequest().body("Quarter must be between 1 and 4"));
+        }
+
+        var operations = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if (operations.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+
+        var approvedOperations = operations.stream()
+                .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED)
+                .collect(Collectors.toList());
+
+        return CompletableFuture.completedFuture(
+                ResponseEntity.ok().body(_timeService.filterByQuarter(approvedOperations, numberOfQuarter)));
+    }
+
+    @PostMapping("/get-company-operations-order-by-dates")
+    @Operation(
+            summary = "Получение операций компании по диапазону дат",
+            description = "Возвращает утвержденные операции текущей компании в указанном диапазоне дат"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Операции успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
+            @ApiResponse(responseCode = "400", description = "Невалидные даты"),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    
+    public CompletableFuture<ResponseEntity<?>> getCompanyOperationsOrderByDates(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Диапазон дат для фильтрации",
+                    required = true,
+                    content = @Content(schema = @Schema(implementation = SortByDateDTO.class))
+            )
+            @RequestBody SortByDateDTO dto,
+            HttpServletRequest request) {
+
+        if (!dto.isValid()) {
+            return CompletableFuture.completedFuture(
+                    ResponseEntity.badRequest().body("dto is invalid"));
+        }
+
+        var operations = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if (operations.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+
+        var approvedOperations = operations.stream()
+                .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED)
+                .collect(Collectors.toList());
+
+        return CompletableFuture.completedFuture(
+                ResponseEntity.ok().body(_timeService.filterByDateTimeRange(
+                        approvedOperations, dto.date1, dto.date2)));
+    }
+
+    @GetMapping("/get-company-operations-order-by-date-year")
+    @Operation(
+            summary = "Получение операций компании за год",
+            description = "Возвращает утвержденные операции текущей компании за текущий год"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Операции успешно получены",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = RequestModel.class)))),
+            @ApiResponse(responseCode = "204", description = "Нет данных"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    
+    public CompletableFuture<ResponseEntity<?>> getCompanyOperationsOrderByYear(HttpServletRequest request) {
+        var operations = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
+        if (operations.isEmpty())
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+
+        var approvedOperations = operations.stream()
+                .filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVED)
+                .collect(Collectors.toList());
+
+        return CompletableFuture.completedFuture(
+                ResponseEntity.ok().body(_timeService.filterByCurrentYear(approvedOperations)));
+    }
+
+    @GetMapping("/get-project-statistic/{projectId}")
     @Operation(
             summary = "Получение статистики по проекту",
             description = "Возвращает статистику по операциям указанного проекта"
@@ -518,28 +744,31 @@ public class RequestController {
             @ApiResponse(responseCode = "204", description = "Нет данных"),
             @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public ResponseEntity<?> getProjectStatistic(
-            @Parameter(description = "Название проекта", required = true)
+    
+    public CompletableFuture<ResponseEntity<?>> getProjectStatistic(
+            @Parameter(description = "ID проекта", required = true)
             @PathVariable Long projectId,
-            HttpServletRequest request){
+            HttpServletRequest request) {
 
-        var projectOperations = _requestRepository.findByProjectIdAndCompanyId(projectId, Long.parseLong(request.getHeader("X-Company-Id")));
+        var projectOperations = _requestRepository.findByProjectIdAndCompanyId(
+                projectId,
+                Long.parseLong(request.getHeader("X-Company-Id"))
+        );
+
+        if (projectOperations.isEmpty()) {
+            return CompletableFuture.completedFuture(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+        }
+
         StatDTO stat = new StatDTO();
-        stat.setRevenue(projectOperations.stream().filter(x -> x.getSum() > 0).mapToDouble(x -> x.getSum()).sum());
-        stat.setProfit(projectOperations.stream().mapToDouble(x -> x.getSum()).sum());
+        stat.setRevenue(projectOperations.stream()
+                .filter(x -> x.getSum() > 0)
+                .mapToDouble(x -> x.getSum())
+                .sum());
+        stat.setProfit(projectOperations.stream()
+                .mapToDouble(x -> x.getSum())
+                .sum());
         stat.setCountOfOperations(projectOperations.stream().count());
 
-        return ResponseEntity.ok().body(stat);
+        return CompletableFuture.completedFuture(ResponseEntity.ok().body(stat));
     }
-
 }
-
-
-///TODO : ПОИСК НУЖНО СДЕЛАТЬ ПО ТРИГРАММАМ
-///TODO : ОПЕРАЦИИ ТОЛЬКО АПРУВНУТЫЕ МОГУТ БЫТЬ //есть
-///TODO : ЗАЯВКИ ВСЕ МОГУТ БЫТЬ (ЛЮБОЙ СТАТУС МОЖЕТ БЫТЬ) //есть
-///TODO : ПОИСК ЗАЯВОК НЕ ДОЛЖЕН БЫ ПО ПРОЕКТУ (ДОЛЖЕН БЫТЬ ПРОСТО ЗАПРОС НА ВСЕ МАТЬ ТВОЮ ЗАПРОСЫ БЛЯ) //есть
-/// TODO : СДЕЛАТЬ ВАЛИДАЦИЮ НА СТАТУС ЗАЯВКИ  (ЕСЛИ ПОПЫТАТЬСЯ ПОВТОРНО АПРУВНУТЬ АПРУВНУТУЮ ЗАЯВКУ) //есть
-/// TODO : СДЕЛАТЬ ФИЛЬТРАЦИЮ ПО МЕСЯЦУ //есть
-
-///TODO : ДОБАВИТЬ БЛОКИ СТАТИСТИКИ
