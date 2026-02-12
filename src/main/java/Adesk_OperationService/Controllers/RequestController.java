@@ -235,6 +235,8 @@ public class RequestController {
             if(requests.isEmpty())
                 return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 
+            requests = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING).toList();
+
             return ResponseEntity.ok().body(requests);
         } catch(Exception ex){
             log.error(ex.getMessage());
@@ -306,8 +308,8 @@ public class RequestController {
 
         var req = requestOpt.get();
 
-        req.setApprovedStatus(RequestStatuses.DISAPPROVED);
-        _requestRepository.save(req);
+//        req.setApprovedStatus(RequestStatuses.DISAPPROVED);
+        _requestRepository.delete(req);
 
         return ResponseEntity.ok().body("successfully disapproved");
     }
@@ -346,6 +348,7 @@ public class RequestController {
         var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
         if(requests.isEmpty())
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        requests = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING).toList();
 
         return ResponseEntity.ok().body(_timeService.filterByCurrentWeek(requests)); //фильтрация по текущей неделе
     }
@@ -364,6 +367,7 @@ public class RequestController {
         var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
         if(requests.isEmpty())
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        requests = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING).toList();
 
         return ResponseEntity.ok().body(_timeService.filterByCurrentMonth(requests));
     }
@@ -393,6 +397,7 @@ public class RequestController {
         var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
         if(requests.isEmpty())
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        requests = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING).toList();
 
         return ResponseEntity.ok().body(_timeService.filterByDateTimeRange(requests, dto.date1, dto.date2));
     }
@@ -415,6 +420,7 @@ public class RequestController {
         var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
         if(requests.isEmpty())
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        requests = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING).toList();
 
         return ResponseEntity.ok().body(_timeService.filterByQuarter(requests, numberOfQuarter));
     }
@@ -459,6 +465,7 @@ public class RequestController {
         var requests = _requestRepository.findByCompanyId(Long.parseLong(request.getHeader("X-Company-Id")));
         if(requests.isEmpty())
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        requests = requests.stream().filter(x -> x.getApprovedStatus() == RequestStatuses.APPROVING).toList();
 
         return ResponseEntity.ok().body(_timeService.filterByCurrentYear(requests));
     }
