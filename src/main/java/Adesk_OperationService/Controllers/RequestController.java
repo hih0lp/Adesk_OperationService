@@ -764,4 +764,13 @@ public class RequestController {
             return ResponseEntity.ok().body(stat);
         });
     }
+
+
+    @PutMapping("/edit-operation/{id}")
+    public CompletableFuture<ResponseEntity<?>> editOperationAsync(@PathVariable Long id, @RequestBody RequestFormDTO dto ,HttpServletRequest request){
+        return CompletableFuture.supplyAsync(() -> {
+            var requestContext = new RequestContext(Long.parseLong(request.getHeader("X-Company-Id")), request.getHeader("X-User-Email"));
+            return requestService.editOperationAsync(id, dto, requestContext);
+        }).thenApply(x -> ResponseEntity.ok().body("successfully editing"));
+    }
 }

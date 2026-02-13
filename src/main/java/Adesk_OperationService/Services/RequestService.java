@@ -81,6 +81,75 @@
             });
         }
 
+        public CompletableFuture<Void> editOperationAsync(Long id, RequestFormDTO dto, RequestContext requestContext) {
+            return CompletableFuture.runAsync(() -> {
+                var operationOpt = requestRepository.findById(id);
+                if (operationOpt.isEmpty()) throw new RuntimeException("operation doesn't exist");
+
+                var operation = operationOpt.get();
+
+                operation.setDescription(dto.getDescription());
+                operation.setTypeOfOperation(dto.getTypeOfOperation());
+                operation.setProjectId(dto.getProjectId());
+                operation.setNameOfCounterparty(dto.getNameOfCounterparty());
+                operation.setSum(dto.getSum());
+                operation.setCreatorLogin(dto.getResponsibleLogin());
+
+                if (dto.getFiles() != null && !dto.getFiles().isEmpty()) {
+                    List<String> newFileNames = dto.getFiles().stream()
+                            .filter(f -> !f.isEmpty())
+                            .map(MultipartFile::getOriginalFilename)
+                            .collect(Collectors.toList());
+
+                    List<FileModel> filesToRemove = operation.getFiles().stream()
+                            .filter(file -> !newFileNames.contains(file.getOriginalFilename()))
+                            .collect(Collectors.toList());
+
+                    for (FileModel fileToRemove : filesToRemove) {
+                        operation.removeFile(fileToRemove);
+                    }
+
+                    for (MultipartFile multipartFile : dto.getFiles()) {
+                        if (!multipartFile.isEmpty()) {
+                            try {
+                                FileModel existingFile = operation.getFiles().stream()
+                                        .filter(f -> f.getOriginalFilename().equals(multipartFile.getOriginalFilename()))
+                                        .findFirst()
+                                        .orElse(null);
+
+                                if (existingFile != null) {
+                                    existingFile.setFileSize(multipartFile.getSize());
+                                    existingFile.setContent(multipartFile.getBytes());
+                                    existingFile.setUserEmail(requestContext.userEmail());
+//                                    existingFile.setCompressed(false);
+                                    existingFile.setStoredFilename(null);
+                                    existingFile.setHref(null);
+                                } else {
+                                    FileModel newFile = FileModel.builder()
+                                            .originalFilename(multipartFile.getOriginalFilename())
+                                            .fileSize(multipartFile.getSize())
+                                            .content(multipartFile.getBytes())
+                                            .userEmail(requestContext.userEmail())
+                                            .companyId(operation.getCompanyId())
+                                            .request(operation)
+                                            .isCompressed(false)
+                                            .build();
+                                    operation.addFile(newFile);
+                                }
+                            } catch (IOException e) {
+                                throw new RuntimeException("Failed to process file: " +
+                                        multipartFile.getOriginalFilename(), e);
+                            }
+                        }
+                    }
+                } else {
+                    operation.getFiles().clear();
+                }
+
+                requestRepository.save(operation);
+            });
+        }
+
         private FileModel createFileModel(MultipartFile multipartFile,
                                           RequestModel request,
                                           String userEmail) throws IOException {
