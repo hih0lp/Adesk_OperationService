@@ -767,9 +767,30 @@ public class RequestController {
 
 
     @PutMapping("/edit-operation/{id}")
-    public CompletableFuture<ResponseEntity<?>> editOperationAsync(@PathVariable Long id, @RequestBody RequestFormDTO dto ,HttpServletRequest request){
+    @Operation(summary = "Редактирование операции",
+            description = "Обновляет существующую операцию по ID с новыми данными из формы")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Операция успешно отредактирована",
+                    content = @Content(schema = @Schema(implementation = String.class))),
+            @ApiResponse(responseCode = "400", description = "Некорректные данные запроса"),
+            @ApiResponse(responseCode = "404", description = "Операция не найдена"),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
+    })
+    public CompletableFuture<ResponseEntity<?>> editOperationAsync(
+            @Parameter(description = "ID операции", required = true, example = "123")
+            @PathVariable Long id,
+
+            @Parameter(description = "Данные для обновления операции", required = true)
+            @RequestBody RequestFormDTO dto,
+
+            @Parameter(hidden = true)
+            HttpServletRequest request) {
+
         return CompletableFuture.supplyAsync(() -> {
-            var requestContext = new RequestContext(Long.parseLong(request.getHeader("X-Company-Id")), request.getHeader("X-User-Email"));
+            var requestContext = new RequestContext(
+                    Long.parseLong(request.getHeader("X-Company-Id")),
+                    request.getHeader("X-User-Email")
+            );
             return requestService.editOperationAsync(id, dto, requestContext);
         }).thenApply(x -> ResponseEntity.ok().body("successfully editing"));
     }
