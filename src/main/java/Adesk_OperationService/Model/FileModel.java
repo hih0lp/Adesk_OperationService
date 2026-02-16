@@ -32,7 +32,7 @@ public class FileModel {
 
 //    @Lob
     @JsonIgnore
-    @Basic(fetch = FetchType.EAGER)
+    @Basic(fetch = FetchType.LAZY)
     @Column(name = "content", columnDefinition = "bytea")
     private byte[] content;
 
