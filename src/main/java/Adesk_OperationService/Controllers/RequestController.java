@@ -767,6 +767,7 @@ public class RequestController {
 
 
     @PutMapping(value = "/edit-operation/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
     @Operation(summary = "Редактирование операции",
             description = "Обновляет существующую операцию по ID с новыми данными из формы")
     @ApiResponses(value = {
