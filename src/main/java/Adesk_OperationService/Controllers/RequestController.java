@@ -781,7 +781,7 @@ public class RequestController {
             @PathVariable Long id,
 
             @Parameter(description = "Данные для обновления операции", required = true)
-            @RequestBody RequestFormDTO dto,
+            @ModelAttribute RequestFormDTO dto,
 
             @Parameter(hidden = true)
             HttpServletRequest request) {
