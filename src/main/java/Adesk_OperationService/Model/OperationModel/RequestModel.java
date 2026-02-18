@@ -59,7 +59,7 @@ public class RequestModel {
             mappedBy = "request",
             cascade = CascadeType.ALL, // При удалении request удаляются все связанные файлы
             orphanRemoval = true,      // При отсоединении файла от request - удаляем файл
-            fetch = FetchType.EAGER     // Ленивая загрузка файлов
+            fetch = FetchType.LAZY     // Ленивая загрузка файлов
     )
     private List<FileModel> files = new ArrayList<>();
 
